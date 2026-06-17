@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+*.so
+
+# Env
+.env
+*.env.local
+
+# Data (large files — use DVC or LFS)
+backend/data/rasters/
+backend/data/masks/
+backend/data/checkpoints/*.pth
+backend/data/graphs/osm_fallback.gpickle
+backend/data/cache/
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Node
+node_modules/
+frontend/.next/
+frontend/out/
+
+# Build artifacts
+*.log
+.DS_Store
+Thumbs.db
+
+# Docker
+*.tar
+
+# Datasets
+backend/data/spacenet_roads/
