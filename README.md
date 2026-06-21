@@ -22,6 +22,7 @@ Built for ISRO NNRMS — Problem Statement PS4 | 30-hour hackathon
 - [Known Limitations](#known-limitations)
 - [Quick Start](#quick-start)
 - [Tech Stack](#tech-stack)
+- [Author](#Author)
 
 ---
 
