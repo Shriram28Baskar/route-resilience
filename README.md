@@ -246,12 +246,14 @@ Interactive docs: **http://localhost:8000/docs**
 | APIs | Bhuvan WMS, Groq API (LLaMA-3) |
 
 ---
+## 👨‍💻 Author
 
-## Team Execution Plan
+**Shriram Baskaran**
 
-See `PRD.md` for the full 30-hour two-team execution timeline.
+Computer Science Student | AI/ML Enthusiast | Aspiring Machine Learning Engineer
 
-**Sub-Team A** (ML): `backend/app/ml/`, `notebooks/`
-**Sub-Team B** (Graph/Frontend): `backend/app/graph_pipeline/`, `backend/app/simulation/`, `frontend/`
+- GitHub: https://github.com/Shriram28Baskar
+- LinkedIn: https://www.linkedin.com/in/shriram-baskaran/
+- Email: shrirambaskaran21@gmail.com
 
-**Critical fallback:** OSM graph pre-downloaded via `scripts/download_data.py` means Sub-Team B can build and demo the entire dashboard independently of model training progress.
+Passionate about building AI-powered systems, Machine Learning solutions, and real-world applications that create meaningful impact.
