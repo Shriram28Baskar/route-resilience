@@ -247,7 +247,7 @@ Interactive docs: **http://localhost:8000/docs**
 | APIs | Bhuvan WMS, Groq API (LLaMA-3) |
 
 ---
-## 👨‍💻 Author
+## Author
 
 **Shriram Baskaran**
 
