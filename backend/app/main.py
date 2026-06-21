@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import segmentation, graph, simulation, accessibility, copilot, reports
+from app.api import segmentation, graph, simulation, accessibility, copilot, reports, bhuvan
 from app.graph_pipeline.graph_build import GraphStore
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
@@ -82,6 +82,7 @@ app.include_router(simulation.router,   prefix="/simulate",    tags=["Simulation
 app.include_router(accessibility.router,prefix="/accessibility",tags=["Accessibility"])
 app.include_router(copilot.router,      prefix="/copilot",     tags=["Copilot"])
 app.include_router(reports.router,      prefix="/reports",     tags=["Reports"])
+app.include_router(bhuvan.router,       prefix="/bhuvan",      tags=["Bhuvan/ISRO"])
 
 
 @app.get("/health", tags=["Meta"])

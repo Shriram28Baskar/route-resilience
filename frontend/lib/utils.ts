@@ -21,9 +21,18 @@ export function centralityColor(score: number): string {
  */
 export function formatDuration(seconds: number | null | undefined): string {
   if (seconds === null || seconds === undefined) return "N/A";
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
-  return `${(seconds / 3600).toFixed(1)}h`;
+  const isNeg = seconds < 0;
+  const s = Math.round(Math.abs(seconds));
+  const sign = isNeg ? "-" : "";
+  if (s < 60) return `${sign}${s}s`;
+  if (s < 3600) {
+    const m = Math.floor(s / 60);
+    const rs = s % 60;
+    return rs > 0 ? `${sign}${m}m ${rs}s` : `${sign}${m}m`;
+  }
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return m > 0 ? `${sign}${h}h ${m}m` : `${sign}${h}h`;
 }
 
 /**
@@ -31,8 +40,11 @@ export function formatDuration(seconds: number | null | undefined): string {
  */
 export function formatDistance(metres: number | null | undefined): string {
   if (metres === null || metres === undefined) return "N/A";
-  if (metres < 1000) return `${Math.round(metres)}m`;
-  return `${(metres / 1000).toFixed(2)}km`;
+  const isNeg = metres < 0;
+  const m = Math.abs(metres);
+  const sign = isNeg ? "-" : "";
+  if (m < 1000) return `${sign}${Math.round(m)}m`;
+  return `${sign}${(m / 1000).toFixed(2)}km`;
 }
 
 /**

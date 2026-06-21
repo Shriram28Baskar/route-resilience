@@ -85,18 +85,18 @@ class GradCAM:
             h.remove()
 
 
-def generate_gradcam(image_np: np.ndarray, target_class: int = 1) -> np.ndarray:
+def generate_gradcam(model_image_np: np.ndarray, visual_image_np: np.ndarray, target_class: int = 1) -> np.ndarray:
     """
     Generate a Grad-CAM overlay for the given RGB tile.
 
     Returns:
         uint8 RGB overlay image (H, W, 3) — Jet colormap on the original image.
     """
-    h, w = image_np.shape[:2]
+    h, w = visual_image_np.shape[:2]
     model = _get_model()
     model.eval()
 
-    input_tensor = preprocess(image_np)
+    input_tensor = preprocess(model_image_np)
     input_tensor.requires_grad_(True)
 
     cam_gen = GradCAM(model)
@@ -113,6 +113,6 @@ def generate_gradcam(image_np: np.ndarray, target_class: int = 1) -> np.ndarray:
     heatmap = cv2.applyColorMap((cam_resized * 255).astype(np.uint8), cv2.COLORMAP_JET)
     heatmap_rgb = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
 
-    # Overlay on original image
-    overlay = cv2.addWeighted(image_np.astype(np.uint8), 0.55, heatmap_rgb, 0.45, 0)
+    # Overlay on visual image (not the scrambled model image)
+    overlay = cv2.addWeighted(visual_image_np.astype(np.uint8), 0.55, heatmap_rgb, 0.45, 0)
     return overlay

@@ -184,6 +184,7 @@ def graph_to_geojson(G: nx.Graph) -> dict:
             "properties": {
                 "id": str(node_id),
                 "type": "node",
+                "degree": G.degree(node_id),
                 **{k: v for k, v in data.items() if k not in ("x", "y")},
             },
         })
@@ -191,19 +192,37 @@ def graph_to_geojson(G: nx.Graph) -> dict:
     for u, v, data in G.edges(data=True):
         u_data = G.nodes[u]
         v_data = G.nodes[v]
+        # Handle cases where OSM tags are lists (e.g., ['primary', 'primary_link'])
+        hw = data.get("highway", "")
+        if isinstance(hw, list):
+            hw = hw[0]
+
+        if "geometry" in data:
+            import shapely.geometry
+            if isinstance(data["geometry"], shapely.geometry.LineString):
+                coords = list(data["geometry"].coords)
+            else:
+                coords = [
+                    [u_data.get("x", 0), u_data.get("y", 0)],
+                    [v_data.get("x", 0), v_data.get("y", 0)],
+                ]
+        else:
+            coords = [
+                [u_data.get("x", 0), u_data.get("y", 0)],
+                [v_data.get("x", 0), v_data.get("y", 0)],
+            ]
+
         features.append({
             "type": "Feature",
             "geometry": {
                 "type": "LineString",
-                "coordinates": [
-                    [u_data.get("x", 0), u_data.get("y", 0)],
-                    [v_data.get("x", 0), v_data.get("y", 0)],
-                ],
+                "coordinates": coords,
             },
             "properties": {
                 "source": str(u),
                 "target": str(v),
                 "type": "edge",
+                "highway": str(hw),
                 "length": data.get("length", 0),
                 "weight": data.get("weight", 0),
             },

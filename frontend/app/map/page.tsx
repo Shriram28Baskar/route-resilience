@@ -3,8 +3,8 @@
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Layers, Hospital, GitBranch, AlertTriangle, Users } from "lucide-react";
-import { getCriticality, getGraphMetrics, getHospitalAccessibility, getEquityAnalysis, getGraphGeoJSON, type CriticalityResponse, type GraphMetrics, type HospitalAccessibility, type EquityResponse } from "@/lib/api";
+import { ShieldAlert, Layers, Hospital, GitBranch, AlertTriangle, Users } from "lucide-react";
+import { getCriticality, getGraphMetrics, getHospitalAccessibility, getEmergencyServices, getEquityAnalysis, getGraphGeoJSON, type CriticalityResponse, type GraphMetrics, type HospitalAccessibility, type EmergencyServicesResponse, type EquityResponse } from "@/lib/api";
 import { centralityColor, resilienceColor } from "@/lib/utils";
 
 // Dynamically import the map to avoid SSR issues with Leaflet
@@ -14,31 +14,51 @@ export default function MapPage() {
   const [criticality, setCriticality] = useState<CriticalityResponse | null>(null);
   const [metrics, setMetrics] = useState<GraphMetrics | null>(null);
   const [hospitals, setHospitals] = useState<HospitalAccessibility | null>(null);
+  const [emergencyServices, setEmergencyServices] = useState<EmergencyServicesResponse | null>(null);
   const [equity, setEquity] = useState<EquityResponse | null>(null);
   const [graphGeojson, setGraphGeojson] = useState<GeoJSON.FeatureCollection | null>(null);
-  const [activeLayer, setActiveLayer] = useState<"centrality" | "hospitals" | "topology" | "equity">("centrality");
+  const [activeLayer, setActiveLayer] = useState<"centrality" | "hospitals" | "topology" | "equity" | "emergency">("centrality");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      getCriticality(50),
-      getGraphMetrics(),
-      getGraphGeoJSON(),
-      getEquityAnalysis(),
-    ])
-      .then(([c, m, g, e]) => { setCriticality(c); setMetrics(m); setGraphGeojson(g); setEquity(e); })
+    getGraphGeoJSON().then(setGraphGeojson).catch(console.error);
+    getGraphMetrics().then(setMetrics).catch(console.error);
+    getEquityAnalysis().then(setEquity).catch(console.error);
+    getCriticality(50)
+      .then(setCriticality)
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
   const loadHospitals = async () => {
     if (hospitals) return;
-    const h = await getHospitalAccessibility().catch(console.error);
-    if (h) setHospitals(h);
+    setLoading(true);
+    try {
+      const h = await getHospitalAccessibility();
+      if (h) setHospitals(h);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadEmergencyServices = async () => {
+    if (emergencyServices) return;
+    setLoading(true);
+    try {
+      const e = await getEmergencyServices();
+      if (e) setEmergencyServices(e);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     if (activeLayer === "hospitals") loadHospitals();
+    if (activeLayer === "emergency") loadEmergencyServices();
   }, [activeLayer]);
 
   return (
@@ -82,12 +102,13 @@ export default function MapPage() {
             <MapSkeleton />
           ) : (
             <RoadMap
-              centrality={criticality}
-              hospitals={hospitals}
-              equity={equity}
-              activeLayer={activeLayer}
-              graphGeojson={graphGeojson}
-            />
+            centrality={criticality}
+            hospitals={hospitals}
+            emergencyServices={emergencyServices}
+            equity={equity}
+            activeLayer={activeLayer}
+            graphGeojson={graphGeojson}
+          />
           )}
         </div>
 
@@ -242,5 +263,6 @@ function MapSkeleton() {
 const LAYERS = [
   { id: "centrality", label: "Criticality",  icon: AlertTriangle },
   { id: "hospitals",  label: "Hospitals",    icon: Hospital },
+  { id: "emergency",  label: "Fire & Police",icon: ShieldAlert },
   { id: "topology",   label: "Topology",     icon: GitBranch },
 ];

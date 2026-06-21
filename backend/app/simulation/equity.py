@@ -3,7 +3,7 @@ Equity & Healthcare Desert Analysis
 Calculates zones with poor accessibility and models vulnerable populations.
 """
 import logging
-import random
+import os
 from typing import List, Dict, Any
 
 import networkx as nx
@@ -62,26 +62,66 @@ def generate_equity_analysis(G: nx.Graph, facilities: List[Dict]) -> Dict[str, A
                     "nearest_facility_distance_m": min_dist
                 })
                 
-    # 2. Vulnerable Population Clusters (Synthetic)
-    # Generate 3-5 clusters randomly located, some overlapping with deserts
+    # 2. Vulnerable Population Clusters — loaded from ward-level population fixture
     clusters = []
-    num_clusters = random.randint(3, 5)
-    for _ in range(num_clusters):
-        cx = min_x + random.random() * (max_x - min_x)
-        cy = min_y + random.random() * (max_y - min_y)
-        
-        # Check if in desert
-        in_desert = any(((cx - d['lon'])**2 + (cy - d['lat'])**2)**0.5 * 111000 < d['radius'] for d in deserts)
-        pop = random.randint(500, 5000)
-        risk = "HIGH" if in_desert else "MEDIUM" if random.random() > 0.5 else "LOW"
-        
-        clusters.append({
-            "lat": cy,
-            "lon": cx,
-            "population": pop,
-            "risk_level": risk,
-            "type": random.choice(["elderly", "disabled", "low_income"])
-        })
+    csv_path = os.path.join(
+        os.path.dirname(__file__),          # .../app/simulation/
+        "..", "..", "data", "infrastructure", "worldpop_bengaluru.csv"
+    )
+    csv_path = os.path.normpath(csv_path)
+
+    try:
+        import csv
+        with open(csv_path, newline="", encoding="utf-8") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                try:
+                    cx = float(row["lon"])
+                    cy = float(row["lat"])
+                    pop = int(row["population_2011"])
+                    base_risk = row.get("risk_level", "MEDIUM").strip().upper()
+
+                    # Elevate risk if the ward falls inside a detected desert zone
+                    in_desert = any(
+                        ((cx - d["lon"]) ** 2 + (cy - d["lat"]) ** 2) ** 0.5 * 111000
+                        < d["radius"]
+                        for d in deserts
+                    )
+                    if in_desert and base_risk not in ("CRITICAL", "HIGH"):
+                        base_risk = "HIGH"
+
+                    # Build vulnerability type string from CSV percentages
+                    elderly_pct = float(row.get("vulnerable_elderly_pct", 0))
+                    disabled_pct = float(row.get("vulnerable_disabled_pct", 0))
+                    bpl_pct = float(row.get("below_poverty_line_pct", 0))
+                    vuln_type = max(
+                        [("elderly", elderly_pct), ("disabled", disabled_pct), ("low_income", bpl_pct)],
+                        key=lambda x: x[1],
+                    )[0]
+
+                    clusters.append({
+                        "ward_id": row.get("ward_id", ""),
+                        "name": row.get("ward_name", ""),
+                        "lat": cy,
+                        "lon": cx,
+                        "population": pop,
+                        "risk_level": base_risk,
+                        "type": vuln_type,
+                        "elderly_pct": elderly_pct,
+                        "disabled_pct": disabled_pct,
+                        "bpl_pct": bpl_pct,
+                        "nearest_hospital_dist_km": float(
+                            row.get("nearest_hospital_dist_km", 0)
+                        ),
+                        "in_desert": in_desert,
+                    })
+                except (ValueError, KeyError) as row_err:
+                    logger.warning(f"Skipping malformed population row: {row_err}")
+    except FileNotFoundError:
+        logger.warning(
+            f"Population fixture not found at {csv_path}. "
+            "Vulnerable cluster analysis will be empty."
+        )
         
     # 3. Overall Equity Score
     # Base 100, minus penalty for deserts and high risk clusters

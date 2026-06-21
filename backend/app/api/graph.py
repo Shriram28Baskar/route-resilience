@@ -139,8 +139,12 @@ def graph_criticality(top_n: Optional[int] = 20, k: Optional[int] = 50):
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
 
+    # For massive graphs (like the fallback), use a much smaller k to prevent timeouts
+    n = G.number_of_nodes()
+    effective_k = min(k, 5) if n > 5000 else k
+
     # 1. Betweenness
-    betweenness = compute_betweenness(G, k=k)
+    betweenness = compute_betweenness(G, k=effective_k)
     ranked_b = sorted(betweenness.items(), key=lambda x: x[1], reverse=True)
     gatekeepers = [
         {"node_id": str(nid), "score": score, "x": G.nodes[nid].get("x", 0), "y": G.nodes[nid].get("y", 0)}
@@ -154,7 +158,7 @@ def graph_criticality(top_n: Optional[int] = 20, k: Optional[int] = 50):
     aps = get_articulation_points(G)
 
     # 4. Edge Betweenness (Top edges only)
-    edge_betw = compute_edge_betweenness(G, k=k)
+    edge_betw = compute_edge_betweenness(G, k=effective_k)
     # Sort and take top edges
     ranked_edges = sorted(edge_betw.items(), key=lambda x: x[1], reverse=True)[:50]
     critical_edges = [

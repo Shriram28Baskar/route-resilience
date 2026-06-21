@@ -44,7 +44,7 @@ def generate_recommendations(G: nx.Graph) -> List[Dict[str, Any]]:
             "description": "This node is a critical gatekeeper. Reinforcing it prevents major network partitioning.",
             "target_node": str(top_node),
             "rgs": round(max(rgs, 0.05), 3),
-            "cost_estimate": "$250k - $500k",
+            "cost_estimate": "₹2.5 Cr - ₹5.0 Cr",
             "action": "flood_barrier"
         })
 

@@ -139,6 +139,18 @@ export interface RecommendationsResponse {
   recommendations: Recommendation[];
 }
 
+export interface EmergencyServicesResponse {
+  facilities: Array<{
+    name: string;
+    lat: number;
+    lon: number;
+    osm_id: string;
+    amenity: string;
+  }>;
+  facility_node_ids: string[];
+}
+
+
 export interface SimulateInvestmentResponse {
   baseline_ri: number;
   projected_ri: number;
@@ -258,6 +270,93 @@ export async function ablateNodes(nodeIds: string[], autoTopN = 0): Promise<Abla
   });
 }
 
+export interface AblateStrategyResult {
+  strategy: string;
+  color: string;
+  nodes_removed: number;
+  resilience_index: number | null;
+  avg_path_length: number | null;
+  disconnected: boolean;
+  components: number;
+  winner_label?: string;
+}
+
+export interface AblateCompareResponse {
+  strategies: AblateStrategyResult[];
+  baseline_avg_path: number | null;
+  top_n: number;
+}
+
+export async function compareAblation(topN: number): Promise<AblateCompareResponse> {
+  return request<AblateCompareResponse>(`/simulate/ablate/compare`, {
+    method: "POST",
+    body: JSON.stringify({ top_n: topN }),
+  });
+}
+
+export interface PrescribeSuggestion {
+  rank: number;
+  type: string;
+  from_node: string;
+  to_node: string;
+  from_coords: [number, number];
+  to_coords: [number, number];
+  estimated_resilience_gain: number;
+  attacked_ri: number;
+  validated_ri: number;
+  baseline_ri: number;
+  new_resilience_index: number;
+  rationale: string;
+  isolated_nodes: number;
+  priority: string;
+  cost_estimate: string;
+}
+
+export interface PrescribeResponse {
+  baseline_ri: number;
+  attacked_ri: number;
+  ablated_count: number;
+  suggestions: PrescribeSuggestion[];
+}
+
+export async function prescribeAblation(ablatedNodeIds: string[], autoTopN = 0): Promise<PrescribeResponse> {
+  return request<PrescribeResponse>(`/simulate/ablate/prescribe`, {
+    method: "POST",
+    body: JSON.stringify({ ablated_node_ids: ablatedNodeIds, auto_top_n: autoTopN, max_recommendations: 3 }),
+  });
+}
+
+export interface VulnerabilityCriticalNode {
+  rank: number;
+  node_id: string;
+  x: number;
+  y: number;
+  betweenness_score: number;
+  is_articulation_point: boolean;
+  estimated_impact_nodes: number;
+  risk_label: string;
+}
+
+export interface VulnerabilityResponse {
+  critical_nodes: VulnerabilityCriticalNode[];
+  articulation_point_count: number;
+  total_nodes: number;
+  total_edges: number;
+  baseline_metrics: any;
+  fragility_summary: {
+    single_points_of_failure: number;
+    risk_level: string;
+    top_threat: string;
+  };
+}
+
+export async function getVulnerability(topN = 20): Promise<VulnerabilityResponse> {
+  return request<VulnerabilityResponse>(`/simulate/ablate/vulnerability`, {
+    method: "POST",
+    body: JSON.stringify({ top_n: topN }),
+  });
+}
+
 export async function runCascade(nodeIds: string[], maxIterations = 3, threshold = 0.7): Promise<{ cascade_steps: CascadeStep[] }> {
   return request(`/simulate/cascade`, {
     method: "POST",
@@ -299,6 +398,12 @@ export async function simulateInvestment(idx: number): Promise<SimulateInvestmen
   });
 }
 
+
+
+export async function getEmergencyServices(): Promise<EmergencyServicesResponse> {
+  return request<EmergencyServicesResponse>('/accessibility/emergency-services');
+}
+
 export async function getFragilityCurve(): Promise<FragilityResponse> {
   return request<FragilityResponse>(`/simulate/fragility`);
 }
@@ -310,19 +415,128 @@ export async function runScenarios(scenarios: ScenarioDef[]): Promise<MultiScena
   });
 }
 
-export async function simulateFlood(waterLevel: number): Promise<{ ablated_nodes: string[]; elevation_bounds: { min: number; max: number }; water_level: number }> {
+export interface FloodImpactMetrics {
+  population_affected: number;
+  cost_estimate_usd: number;
+  hospitals_affected: number;
+  emergency_stations_affected: number;
+}
+
+export async function simulateFlood(waterLevel: number): Promise<{ 
+  ablated_nodes: string[]; 
+  elevation_bounds: { min: number; max: number }; 
+  water_level: number;
+  impact_metrics: FloodImpactMetrics;
+}> {
   return request(`/simulate/flood`, {
     method: "POST",
     body: JSON.stringify({ water_level: waterLevel }),
   });
 }
 
-export async function getReliefCamps(ablatedNodeIds: string[] = [], numCamps: number = 3): Promise<{ camps: Array<{ id: string; lat: number; lng: number }> }> {
+export async function getReliefCamps(
+  ablatedNodeIds: string[] = [],
+  numCamps: number = 3
+): Promise<{
+  camps: Array<{ id: string; lat: number; lng: number; node_count: number; population_estimate: number }>;
+  catchment_mapping: Record<string, number>;
+}> {
   return request(`/simulate/relief-camps`, {
     method: "POST",
     body: JSON.stringify({ ablated_node_ids: ablatedNodeIds, num_camps: numCamps }),
   });
 }
+
+export interface CrisisPriorityNode {
+  node_id: string;
+  lat: number;
+  lon: number;
+  centrality: number;
+  vulnerability: number;
+  crisis_priority: number;
+}
+
+export interface ZoneImpact {
+  zone_name: string;
+  lat: number;
+  lon: number;
+  population: number;
+  vulnerability: number;
+  critical_nodes_nearby: number;
+  risk_level: "HIGH" | "MEDIUM" | "LOW";
+}
+
+export interface EquityMetricsResponse {
+  equity_score: number;
+  crisis_priority_nodes: CrisisPriorityNode[];
+  zone_impact_matrix: ZoneImpact[];
+  total_zones_analyzed: number;
+  high_risk_zones: number;
+}
+
+export interface TrafficImpactResponse {
+  ablated_count: number;
+  affected_daily_trips: number;
+  avg_baseline_trip_m: number;
+  avg_perturbed_trip_m: number;
+  avg_detour_km: number;
+  extra_minutes_per_commuter: number;
+  total_commuter_minutes_lost: number;
+  total_commuter_hours_lost: number;
+  person_days_lost: number;
+  unreachable_trip_pairs_pct: number;
+  wage_loss_inr: number;
+  fuel_loss_inr: number;
+  logistics_loss_inr: number;
+  total_economic_loss_inr: number;
+  annual_loss_projection_inr: number;
+}
+
+export interface ZoneForecast {
+  zone: string;
+  avg_health_y0: number;
+  avg_health_y10: number;
+  risk_level: "CRITICAL" | "HIGH" | "MODERATE" | "LOW";
+}
+
+export interface DegradationForecastResponse {
+  forecast_years: number[];
+  network_health_trajectory: number[];
+  confidence_band_low: number[];
+  confidence_band_high: number[];
+  annual_failure_probability: number[];
+  budget_scenario: string;
+  zone_forecasts: ZoneForecast[];
+  total_reinvestment_needed_inr: number;
+  critical_segments_count: number;
+  monte_carlo_runs: number;
+}
+
+export async function getEquityMetrics(ablatedNodeIds: string[] = []): Promise<EquityMetricsResponse> {
+  return request<EquityMetricsResponse>(`/simulate/equity-metrics`, {
+    method: "POST",
+    body: JSON.stringify({ ablated_node_ids: ablatedNodeIds }),
+  });
+}
+
+export async function getTrafficImpact(ablatedNodeIds: string[] = []): Promise<TrafficImpactResponse> {
+  return request<TrafficImpactResponse>(`/simulate/traffic-impact`, {
+    method: "POST",
+    body: JSON.stringify({ ablated_node_ids: ablatedNodeIds }),
+  });
+}
+
+export async function getDegradationForecast(
+  years = 10,
+  monteCarlRuns = 50,
+  budgetScenario: "optimistic" | "baseline" | "austerity" = "baseline"
+): Promise<DegradationForecastResponse> {
+  return request<DegradationForecastResponse>(`/simulate/degradation-forecast`, {
+    method: "POST",
+    body: JSON.stringify({ years, monte_carlo_runs: monteCarlRuns, budget_scenario: budgetScenario }),
+  });
+}
+
 
 // ── Accessibility API ──────────────────────────────────────────────────────
 

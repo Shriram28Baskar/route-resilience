@@ -48,13 +48,15 @@ def compute_graph_metrics(G: nx.Graph, fast: bool = False) -> Dict[str, Any]:
                 avg_path_length = nx.average_shortest_path_length(lcc, weight="weight")
                 diameter = nx.diameter(lcc)
             else:
-                # Approximate with a sample
+                # Approximate with a deterministic sample to prevent wild fluctuations
                 import random
-                sample = random.sample(list(lcc.nodes()), min(300, lcc.number_of_nodes()))
+                sorted_nodes = sorted(list(lcc.nodes()))
+                rand_gen = random.Random(42)
+                sample = rand_gen.sample(sorted_nodes, min(300, len(sorted_nodes)))
                 lengths = []
                 for src in sample[:50]:
                     paths = nx.single_source_dijkstra_path_length(lcc, src, weight="weight")
-                    lengths.extend(paths.values())
+                    lengths.extend([d for tgt, d in paths.items() if src != tgt])
                 avg_path_length = sum(lengths) / len(lengths) if lengths else None
         except nx.NetworkXError as exc:
             logger.warning(f"Path length computation failed: {exc}")

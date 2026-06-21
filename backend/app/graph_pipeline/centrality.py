@@ -59,7 +59,7 @@ def compute_betweenness(G: nx.Graph, k: Optional[int] = DEFAULT_K) -> Dict[int, 
     if n == 0:
         return {}
 
-    if G.graph.get("is_osm_fallback") and G.number_of_nodes() == 13486:
+    if G.graph.get("is_osm_fallback"):
         disk_cache = _load_osm_fallback_criticality_cache()
         if "betweenness" in disk_cache:
             logger.info("Returning disk-cached betweenness centrality for OSM fallback graph")
@@ -107,7 +107,7 @@ def compute_betweenness(G: nx.Graph, k: Optional[int] = DEFAULT_K) -> Dict[int, 
     
     _centrality_cache[G][cache_key] = all_centrality
 
-    if G.graph.get("is_osm_fallback") and G.number_of_nodes() == 13486:
+    if G.graph.get("is_osm_fallback"):
         disk_cache = _load_osm_fallback_criticality_cache()
         disk_cache["betweenness"] = all_centrality
         _save_osm_fallback_criticality_cache(disk_cache)
@@ -127,7 +127,7 @@ def compute_closeness(G: nx.Graph, k: Optional[int] = 50) -> Dict[int, float]:
     if cache_key in _centrality_cache[G]:
         return _centrality_cache[G][cache_key]
 
-    if G.graph.get("is_osm_fallback") and G.number_of_nodes() == 13486:
+    if G.graph.get("is_osm_fallback"):
         disk_cache = _load_osm_fallback_criticality_cache()
         if "closeness" in disk_cache:
             logger.info("Returning disk-cached closeness centrality for OSM fallback graph")
@@ -174,7 +174,7 @@ def compute_closeness(G: nx.Graph, k: Optional[int] = 50) -> Dict[int, float]:
         
     _centrality_cache[G][cache_key] = all_centrality
 
-    if G.graph.get("is_osm_fallback") and G.number_of_nodes() == 13486:
+    if G.graph.get("is_osm_fallback"):
         disk_cache = _load_osm_fallback_criticality_cache()
         disk_cache["closeness"] = all_centrality
         _save_osm_fallback_criticality_cache(disk_cache)
@@ -192,7 +192,7 @@ def get_articulation_points(G: nx.Graph) -> list:
     if cache_key in _centrality_cache[G]:
         return _centrality_cache[G][cache_key]
 
-    if G.graph.get("is_osm_fallback") and G.number_of_nodes() == 13486:
+    if G.graph.get("is_osm_fallback"):
         disk_cache = _load_osm_fallback_criticality_cache()
         if "articulation_points" in disk_cache:
             logger.info("Returning disk-cached articulation points for OSM fallback graph")
@@ -202,7 +202,7 @@ def get_articulation_points(G: nx.Graph) -> list:
     ap = list(nx.articulation_points(G))
     _centrality_cache[G][cache_key] = ap
 
-    if G.graph.get("is_osm_fallback") and G.number_of_nodes() == 13486:
+    if G.graph.get("is_osm_fallback"):
         disk_cache = _load_osm_fallback_criticality_cache()
         disk_cache["articulation_points"] = ap
         _save_osm_fallback_criticality_cache(disk_cache)
@@ -226,7 +226,7 @@ def compute_edge_betweenness(G: nx.Graph, k: Optional[int] = DEFAULT_K) -> Dict[
     if cache_key in _centrality_cache[G]:
         return _centrality_cache[G][cache_key]
 
-    if G.graph.get("is_osm_fallback") and G.number_of_nodes() == 13486:
+    if G.graph.get("is_osm_fallback"):
         disk_cache = _load_osm_fallback_criticality_cache()
         if "edge_betweenness" in disk_cache:
             logger.info("Returning disk-cached edge betweenness for OSM fallback graph")
@@ -248,7 +248,7 @@ def compute_edge_betweenness(G: nx.Graph, k: Optional[int] = DEFAULT_K) -> Dict[
         
     _centrality_cache[G][cache_key] = centrality
 
-    if G.graph.get("is_osm_fallback") and G.number_of_nodes() == 13486:
+    if G.graph.get("is_osm_fallback"):
         disk_cache = _load_osm_fallback_criticality_cache()
         disk_cache["edge_betweenness"] = centrality
         _save_osm_fallback_criticality_cache(disk_cache)

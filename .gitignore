@@ -40,3 +40,14 @@ Thumbs.db
 
 # Datasets
 backend/data/spacenet_roads/
+
+# Prevent large unneeded files from being committed
+backend/data/
+data/
+cache/
+backend/cache/
+*.png
+*.tif
+*.json
+scratch.py
+test_request.py

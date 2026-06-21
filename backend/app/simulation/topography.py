@@ -12,10 +12,12 @@ def initialize_elevations(G: nx.MultiDiGraph):
     if first_node is not None and 'elevation' in G.nodes[first_node]:
         return
 
+    GEOID_OFFSET = 820.0
     if not os.path.exists(DEM_PATH):
         print(f"Warning: DEM file not found at {DEM_PATH}. Using fallback elevations.")
         for node in G.nodes():
             G.nodes[node]['elevation'] = 900.0
+            G.nodes[node]['elevation_unknown'] = True
         return
 
     try:
@@ -25,16 +27,33 @@ def initialize_elevations(G: nx.MultiDiGraph):
                 lat = data.get('y')
                 lon = data.get('x')
                 if lat and lon:
-                    for val in src.sample([(lon, lat)]):
-                        G.nodes[node]['elevation'] = float(val[0])
-                        break
+                    try:
+                        found_val = False
+                        for val in src.sample([(lon, lat)]):
+                            v = float(val[0])
+                            if v < 0: # nodata value like -32768
+                                G.nodes[node]['elevation'] = 900.0
+                                G.nodes[node]['elevation_unknown'] = True
+                            else:
+                                G.nodes[node]['elevation'] = v
+                                G.nodes[node]['elevation_unknown'] = False
+                            found_val = True
+                            break
+                        if not found_val:
+                            G.nodes[node]['elevation'] = 900.0
+                            G.nodes[node]['elevation_unknown'] = True
+                    except Exception:
+                        G.nodes[node]['elevation'] = 900.0
+                        G.nodes[node]['elevation_unknown'] = True
                 else:
                     G.nodes[node]['elevation'] = 900.0
+                    G.nodes[node]['elevation_unknown'] = True
         print("Elevations successfully loaded.")
     except Exception as e:
         print(f"Error loading DEM: {e}")
         for node in G.nodes():
             G.nodes[node]['elevation'] = 900.0
+            G.nodes[node]['elevation_unknown'] = True
 
 def flood_ablate(G: nx.MultiDiGraph, water_level: float) -> List[int]:
     """Returns a list of node IDs that are at or below the given water_level."""

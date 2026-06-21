@@ -13,31 +13,58 @@ import networkx as nx
 
 logger = logging.getLogger(__name__)
 
-ASSUMED_SPEED_MPS = 30_000 / 3600   # 30 km/h → m/s
+# Speed lookup by road type (m/s) — OSM highway tag values
+# Source: IRC (Indian Roads Congress) recommended speeds
+ROAD_SPEED_MPS: dict = {
+    "motorway":      33.33,   # 120 km/h
+    "trunk":         27.78,   # 100 km/h
+    "primary":       22.22,   # 80 km/h
+    "secondary":     16.67,   # 60 km/h
+    "tertiary":      13.89,   # 50 km/h
+    "residential":    8.33,   # 30 km/h
+    "service":        5.56,   # 20 km/h
+    "footway":        1.39,   # 5 km/h (walking)
+    "cycleway":       4.17,   # 15 km/h
+    "unclassified":  11.11,   # 40 km/h
+    "default":        8.33,   # 30 km/h fallback
+}
 
+
+def get_road_speed(highway_type: str) -> float:
+    """Return speed in m/s for a given OSM highway type."""
+    return ROAD_SPEED_MPS.get(highway_type, ROAD_SPEED_MPS["default"])
+
+
+import weakref
+
+_baseline_cache = weakref.WeakKeyDictionary()
 
 def compute_resilience_index(
     baseline_G: nx.Graph,
     perturbed_G: nx.Graph,
-    sample_size: int = 200,
+    sample_size: int = 60,
 ) -> Dict[str, Any]:
     """
-    Compute the Resilience Index between a baseline and a perturbed graph.
-
-    Uses approximate average shortest path length (sampled Dijkstra) for
-    performance on large graphs.
-
-    Returns:
-        {
-            "resilience_index": float | None,
-            "baseline_avg_path": float | None,
-            "perturbed_avg_path": float | None,
-            "disconnected": bool,          # True if perturbed graph is disconnected
-            "partition_count": int,        # number of components in perturbed graph
-        }
+    Compute Resilience Index using deterministic sampling and disconnection penalties.
     """
-    baseline_avg = _sample_avg_path(baseline_G, sample_size)
-    perturbed_avg = _sample_avg_path(perturbed_G, sample_size)
+    import random
+    
+    # 1. Deterministic sample of nodes from the baseline graph
+    nodes = sorted(list(baseline_G.nodes()))
+    rng = random.Random(999) # Use different seed from simulation's Random Failure!
+    sources = rng.sample(nodes, min(sample_size, len(nodes)))
+
+    # 2. Compute baseline or get from cache
+    if baseline_G in _baseline_cache and _baseline_cache[baseline_G].get(sample_size):
+        baseline_avg, baseline_counts = _baseline_cache[baseline_G][sample_size]
+    else:
+        baseline_avg, baseline_counts = _compute_baseline_paths(baseline_G, sources)
+        if baseline_G not in _baseline_cache:
+            _baseline_cache[baseline_G] = {}
+        _baseline_cache[baseline_G][sample_size] = (baseline_avg, baseline_counts)
+
+    # 3. Compute perturbed with penalties
+    perturbed_avg = _compute_perturbed_paths(perturbed_G, sources, baseline_counts)
 
     is_disconnected = not nx.is_connected(perturbed_G)
     partition_count = nx.number_connected_components(perturbed_G)
@@ -59,32 +86,45 @@ def compute_resilience_index(
     }
 
 
-def _sample_avg_path(G: nx.Graph, sample_size: int) -> Optional[float]:
-    """
-    Approximate the average shortest path length via sampled Dijkstra.
-    Operates on the largest connected component.
-    """
-    if G.number_of_nodes() < 2:
-        return None
-
-    # Use largest connected component
-    if not nx.is_connected(G):
-        lcc_nodes = max(nx.connected_components(G), key=len)
-        G = G.subgraph(lcc_nodes)
-
-    if G.number_of_nodes() < 2:
-        return None
-
-    import random
-    nodes = list(G.nodes())
-    sample = random.sample(nodes, min(sample_size, len(nodes)))
-
+def _compute_baseline_paths(G: nx.Graph, sources: list):
     lengths = []
-    for src in sample:
-        try:
-            path_lengths = nx.single_source_dijkstra_path_length(G, src, weight="weight")
-            lengths.extend(v for v in path_lengths.values() if v > 0)
-        except Exception:
+    reachable_counts = {}
+    for src in sources:
+        if src not in G:
             continue
+        try:
+            path_lengths = nx.single_source_dijkstra_path_length(G, src, weight="time_s")
+            reachable = [v for v in path_lengths.values() if v > 0]
+            lengths.extend(reachable)
+            reachable_counts[src] = len(reachable)
+        except Exception:
+            reachable_counts[src] = 0
+            
+    avg = sum(lengths) / len(lengths) if lengths else None
+    return avg, reachable_counts
+
+def _compute_perturbed_paths(G: nx.Graph, sources: list, baseline_counts: dict):
+    lengths = []
+    # Use 3600 seconds (1 hour) as the penalty for a broken/unreachable path
+    PENALTY = 3600.0 
+    
+    for src in sources:
+        expected = baseline_counts.get(src, 0)
+        if src not in G:
+            # Source ablated! All its previous paths are broken.
+            lengths.extend([PENALTY] * expected)
+            continue
+            
+        try:
+            path_lengths = nx.single_source_dijkstra_path_length(G, src, weight="time_s")
+            reachable = [v for v in path_lengths.values() if v > 0]
+            lengths.extend(reachable)
+            
+            # Penalize missing destinations
+            missing = expected - len(reachable)
+            if missing > 0:
+                lengths.extend([PENALTY] * missing)
+        except Exception:
+            lengths.extend([PENALTY] * expected)
 
     return sum(lengths) / len(lengths) if lengths else None

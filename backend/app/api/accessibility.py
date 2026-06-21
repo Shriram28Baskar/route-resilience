@@ -112,3 +112,27 @@ async def equity_analysis(
         
     result = generate_equity_analysis(G, facilities)
     return JSONResponse(result)
+
+@router.get("/emergency-services")
+async def emergency_services(
+    south: float = Query(12.92),
+    west: float = Query(77.57),
+    north: float = Query(12.99),
+    east: float = Query(77.64),
+):
+    """
+    Fetch fire stations and police stations from OSM for the given bounding box.
+    """
+    G = GraphStore.get_healed() or GraphStore.get_osm_fallback()
+    if G is None:
+        raise HTTPException(status_code=404, detail="No graph available.")
+
+    facilities = await fetch_facilities(south=south, west=west, north=north, east=east, amenities=["fire_station", "police"])
+    
+    # Snap to graph
+    snapped_nodes = _snap_to_graph(G, facilities)
+
+    return {
+        "facilities": facilities,
+        "facility_node_ids": [str(n) for n in snapped_nodes]
+    }
