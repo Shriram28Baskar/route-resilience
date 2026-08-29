@@ -564,6 +564,55 @@ export async function getEquityAnalysis(
   return request<EquityResponse>(url);
 }
 
+// ── Accessibility Impact Engine ─────────────────────────────────────────────
+
+export interface AccessibilityImpactResponse {
+  hospital_count: number;
+  hospital_node_ids: string[];
+  hospitals: Array<{ name: string; lat: number; lon: number; osm_id: string; amenity?: string }>;
+  ablated_node_ids: string[];
+  baseline: {
+    accessible_node_count: number;
+    inaccessible_node_count: number;
+    avg_time_s: number | null;
+    node_coverage: Record<string, number>;
+  };
+  post_disaster: {
+    accessible_node_count: number;
+    inaccessible_node_count: number;
+    avg_time_s: number | null;
+    node_coverage: Record<string, number>;
+  };
+  impact: {
+    nodes_lost_access: string[];
+    nodes_lost_access_count: number;
+    nodes_degraded: string[];
+    nodes_degraded_count: number;
+    avg_travel_time_increase_s: number;
+    median_travel_time_increase_s: number;
+    disconnected_hospital_count: number;
+    resilience_index_before: number | null;
+    resilience_index_after: number | null;
+    resilience_index: number | null;
+    network_disconnected: boolean;
+    partition_count: number;
+  };
+  best_alternative_route: RouteResult | null;
+}
+
+export async function getAccessibilityImpact(
+  ablatedNodeIds: string[],
+  south = 12.92,
+  west = 77.57,
+  north = 12.99,
+  east = 77.64,
+): Promise<AccessibilityImpactResponse> {
+  return request<AccessibilityImpactResponse>("/accessibility/impact", {
+    method: "POST",
+    body: JSON.stringify({ ablated_node_ids: ablatedNodeIds, south, west, north, east }),
+  });
+}
+
 // ── Copilot API ────────────────────────────────────────────────────────────
 
 export async function chatWithCopilot(
@@ -589,4 +638,368 @@ export async function generateReport(city_name: string, sections: string[], time
     throw new Error(`API ${res.status}: ${detail}`);
   }
   return res.blob();
+}
+
+// ── Step 7: Rainfall Backtest ──────────────────────────────────────────────
+
+export interface BacktestEvent {
+  date: string;
+  rainfall_mm: number;
+  classification: string;
+  water_level_model: { water_level_m: number; methodology: string };
+  flood_result: { flooded_nodes: number; flood_fraction_pct: number };
+  ward_validation: {
+    known_prone_wards_matched: string[];
+    ward_overlap_score_pct: number;  // renamed from validation_score_pct — this is an overlap check, not recall/precision
+  };
+
+}
+
+export interface BacktestResponse {
+  backtest_config: { events_backtested: number; district: string };
+  validation_summary: {
+    total_events_backtested: number;
+    monotonicity_check: string;
+    avg_ward_overlap_score_pct: number;        // renamed from avg_ward_validation_score_pct (H1 fix)
+    avg_false_positive_wards: number;          // added by H1 fix
+    model_limitations: string[];
+  };
+  events: BacktestEvent[];
+}
+
+export async function runRainfallBacktest(
+  min_rainfall_mm = 0,
+  max_events = 50
+): Promise<BacktestResponse> {
+  return request<BacktestResponse>(`/simulate/rainfall-backtest`, {
+    method: "POST",
+    body: JSON.stringify({ min_rainfall_mm, max_events }),
+  });
+}
+
+// ── Step 8: Ward Report ────────────────────────────────────────────────────
+
+export interface WardReport {
+  ward_name: string;
+  assembly_constituency: string;
+  zone: string;
+  census_population_2011: number;
+  graph_nodes_flooded: number;
+  flood_fraction_pct: number;
+  severity: "critical" | "high" | "moderate" | "low";
+}
+
+export interface WardReportResponse {
+  summary: {
+    total_wards_in_graph: number;
+    wards_affected: number;
+    wards_critical: number;
+    total_census_pop_in_affected_wards: number;
+    population_note: string;
+  };
+  critical_wards: string[];
+  ward_reports: WardReport[];
+}
+
+export async function fetchWardReport(ablated_node_ids: string[]): Promise<WardReportResponse> {
+  return request<WardReportResponse>(`/accessibility/ward-report`, {
+    method: "POST",
+    body: JSON.stringify({ ablated_node_ids }),
+  });
+}
+
+// ── Steps 4+5+6: Flood Accessibility Impact ────────────────────────────────
+
+export interface FacilityImpact {
+  label: string;
+  facility_count: number;
+  facilities_flooded: number;
+  facilities_intact: number;
+  baseline: { accessible_nodes: number; avg_travel_time_min: number | null };
+  post_flood: { accessible_nodes: number; avg_travel_time_min: number | null };
+  impact: {
+    nodes_lost_15min_access: number;
+    avg_travel_time_increase_min: number;
+    facilities_disconnected: number;
+  };
+  best_alternative_route: {
+    distance_m: number;
+    travel_time_min: number;
+    path_geojson: GeoJSON.Feature | null;
+  } | null;
+}
+
+export interface FloodAccessibilityResponse {
+  flood_summary: { flooded_nodes: number; road_length_flooded_km: number };
+  population: { affected: number; source: string };
+  ward_breakdown: { top_affected_wards: { ward: string; flooded_nodes: number }[]; total_wards_affected: number };
+  facility_impact: {
+    hospitals: FacilityImpact;
+    fire_stations: FacilityImpact;
+    police: FacilityImpact;
+  };
+}
+
+export async function fetchFloodAccessibilityImpact(
+  ablated_node_ids: string[]
+): Promise<FloodAccessibilityResponse> {
+  return request<FloodAccessibilityResponse>(`/accessibility/flood-impact`, {
+    method: "POST",
+    body: JSON.stringify({ ablated_node_ids }),
+  });
+}
+
+// ── Step 9: Live Weather ───────────────────────────────────────────────────
+
+export interface WeatherData {
+  city: string;
+  current_rainfall_1h_mm: number;
+  temperature_c: number;
+  humidity_pct: number;
+  description: string;
+  risk: { level: string; description: string };
+  source: string;
+}
+
+export async function fetchCurrentWeather(): Promise<WeatherData> {
+  return request<WeatherData>(`/alerts/weather`);
+}
+
+export async function fetchWeatherForecast(hours = 24) {
+  return request(`/alerts/forecast?hours=${hours}`);
+}
+
+// ── Step 10: Alert WebSocket ───────────────────────────────────────────────
+
+export interface FloodAlert {
+  type: "flood_alert";
+  severity: "critical" | "high" | "moderate" | "low";
+  title: string;
+  message: string;
+  details: Record<string, string | number>;
+}
+
+/**
+ * Connect to the backend alert WebSocket.
+ * onAlert is called every time a flood alert is broadcast.
+ * Returns a cleanup function to close the connection.
+ */
+export function connectAlertWebSocket(
+  onAlert: (alert: FloodAlert) => void,
+  onConnect?: () => void,
+  onDisconnect?: () => void,
+): () => void {
+  const WS_BASE = BASE.replace(/^http/, "ws");
+  const ws = new WebSocket(`${WS_BASE}/alerts/ws`);
+
+  ws.onopen = () => {
+    console.log("[Route Resilience] Alert WebSocket connected");
+    onConnect?.();
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.event === "flood_alert" && data.payload) {
+        onAlert(data.payload as FloodAlert);
+      }
+    } catch {
+      // ignore malformed messages
+    }
+  };
+
+  ws.onclose = () => {
+    console.log("[Route Resilience] Alert WebSocket disconnected");
+    onDisconnect?.();
+  };
+
+  ws.onerror = (e) => console.error("[Route Resilience] Alert WS error:", e);
+
+  return () => ws.close();
+}
+
+// ── Historical Disaster Scenarios ─────────────────────────────────────────────
+
+export interface HistoricalScenarioSummary {
+  id: string;
+  name: string;
+  peak_date: string;
+  description: string;
+  data_type: string;
+}
+
+export interface HistoricalScenarioResponse {
+  scenario_metadata: {
+    id: string;
+    name: string;
+    peak_date: string;
+    data_type: string;
+    description: string;
+  };
+  observed_historical_facts: {
+    _label: string;
+    rainfall_mm: number;
+    rainfall_source: string;
+    rainfall_precision: string;
+    rainfall_source_note: string;
+    known_affected_areas_qualitative: string[];
+    known_affected_areas_source: string;
+    known_affected_areas_note: string;
+    infrastructure_impact_note: string;
+  };
+  model_inputs: {
+    _label: string;
+    dem_source: string;
+    graph_source: string;
+    flood_model: string;
+    graph_nodes: number;
+    graph_edges: number;
+    dem_elevation_range: { min_m: number; max_m: number; mean_m: number; unknown_nodes: number };
+    rainfall_runoff_model_output: {
+      _note: string;
+      rainfall_mm: number;
+      water_level_m: number;
+      flooded_nodes_at_this_level: number;
+      limitation: string;
+    };
+    scenario_water_level_m: number;
+    scenario_water_level_basis: string;
+    scenario_water_level_note: string;
+  };
+  simulated_results: {
+    _label: string;
+    water_level_m: number;
+    flood_model: string;
+    flooded_nodes: number;
+    total_nodes: number;
+    flood_fraction_pct: number;
+    road_length_flooded_km: number;
+    surviving_network: {
+      surviving_nodes: number;
+      surviving_components: number;
+      largest_connected_component_nodes: number;
+    };
+    population_in_flood_zone: {
+      value: number;
+      source: string;
+      methodology: string;
+      note: string;
+    };
+    facility_impact: {
+      hospitals_in_flood_zone: number | null;
+      hospitals_total_in_aoi: number | null;
+      emergency_stations_in_flood_zone: number | null;
+      emergency_total_in_aoi: number | null;
+      source: string;
+      note: string;
+    };
+    ward_impact: {
+      wards_with_flooded_nodes: number;
+      top_affected_wards: [string, number][];
+      ward_boundary_source: string;
+    };
+  };
+  directional_comparison: {
+    _label: string;
+    model_predicted_wards_count: number;
+    documented_affected_areas_count: number;
+    exact_name_overlap: string[];
+    partial_name_overlap: string[];
+    areas_outside_aoi: string[];
+    aoi_coverage_note: string;
+    comparison_note: string;
+  };
+  model_limitations: string[];
+}
+
+export async function fetchHistoricalScenarios(): Promise<{ scenarios: HistoricalScenarioSummary[] }> {
+  return request<{ scenarios: HistoricalScenarioSummary[] }>("/simulate/historical/");
+}
+
+export async function fetchHistoricalScenario(
+  scenarioId: string,
+  overrideWaterLevelM?: number
+): Promise<HistoricalScenarioResponse> {
+  const url = overrideWaterLevelM != null
+    ? `/simulate/historical/${scenarioId}?override_water_level_m=${overrideWaterLevelM}`
+    : `/simulate/historical/${scenarioId}`;
+  return request<HistoricalScenarioResponse>(url);
+}
+
+// ── Temporal Flood Projection ─────────────────────────────────────────────────
+
+export interface TemporalNetworkImpact {
+  water_level_m: number;
+  flooded_nodes: number;
+  total_nodes: number;
+  flood_fraction_pct: number;
+  road_length_flooded_km: number;
+  population_in_flood_zone: { value: number; source: string; note: string };
+  wards_affected: number;
+  surviving_components: number;
+  hospitals_flooded: number;
+  total_hospitals: number;
+  resilience_index: number;
+  water_level_clamped_to_dem_max: boolean;
+  clamp_note?: string;
+}
+
+export interface TemporalHorizon {
+  horizon_label: string;
+  data_type: "OBSERVED" | "EXTRAPOLATED" | "MODELED";
+  status: "STABLE" | "DEGRADING" | "CRITICAL";
+  additional_water_depth_mm: number;
+  projected_water_level_m: number;
+  methodology_note: string;
+  network_consequences_note: string;
+  network_impact: TemporalNetworkImpact;
+}
+
+export interface TemporalProjectionResponse {
+  methodology: {
+    model: string;
+    data_limitation: string;
+    observed_source: string;
+    rainfall_rate_note: string;
+    labels_guide: Record<string, string>;
+  };
+  observed_conditions: {
+    _section: string;
+    rainfall_rate_mm_h: number;
+    rainfall_source: string;
+    rainfall_note: string;
+    temperature_c: number | null;
+    humidity_pct: number | null;
+    description: string | null;
+    risk: { level: string; description: string } | null;
+    weather_api_ok: boolean;
+    weather_api_error: string | null;
+  };
+  base_state: {
+    base_water_level_m: number;
+    base_note: string;
+    dem_range: { min_m: number; max_m: number; mean_m: number };
+    override_rainfall_used: boolean;
+    override_base_used: boolean;
+  };
+  temporal_horizons: TemporalHorizon[];
+  next_3h_owm_forecast: {
+    rain_3h_mm: number;
+    data_type: string;
+    source: string;
+    note: string;
+  } | null;
+  computation_ms: number;
+}
+
+export async function fetchTemporalProjection(
+  baseWaterLevelM?: number,
+  overrideRainfallMmH?: number,
+): Promise<TemporalProjectionResponse> {
+  const params = new URLSearchParams();
+  if (baseWaterLevelM !== undefined) params.set("base_water_level_m", String(baseWaterLevelM));
+  if (overrideRainfallMmH !== undefined) params.set("override_rainfall_mm_h", String(overrideRainfallMmH));
+  const qs = params.toString();
+  const url = `${BASE}/simulate/temporal-projection${qs ? `?${qs}` : ""}`;
+  return request<TemporalProjectionResponse>(url);
 }

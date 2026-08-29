@@ -20,23 +20,7 @@ from app.graph_pipeline.centrality import compute_betweenness
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-SYSTEM_PROMPT = """You are an Urban Planning Copilot embedded in the Route Resilience platform — 
-a geospatial AI system for analyzing road network criticality and disaster resilience.
-
-You have access to a live summary of the current road graph, including:
-- Graph connectivity metrics (components, average path length, density)
-- Top gatekeeper nodes (by betweenness centrality)
-- Latest simulation results (node ablation, resilience index, cascade steps)
-- Hospital accessibility data
-
-When answering questions:
-1. Ground every claim in the provided graph/simulation context — do not hallucinate node IDs or scores.
-2. Use precise, quantitative language where data supports it (e.g., "Node 42 carries 18% of all shortest paths").
-3. Be actionable — suggest specific interventions (alternate routes, redundant links, infrastructure priorities).
-4. If asked about a specific location, cross-reference coordinates in the context.
-5. Be concise: planners are busy. Lead with the key insight, then elaborate.
-
-If the requested data is not in the context, say so clearly and suggest what analysis should be run next."""
+from app.api.prompt import SYSTEM_PROMPT
 
 
 class ChatMessage(BaseModel):
@@ -81,7 +65,7 @@ async def copilot_chat(req: CopilotRequest):
 
 
 def _build_context(override: Optional[Dict] = None) -> Dict:
-    """Assemble a lightweight context dict from the current graph state."""
+    """Assemble a structured context for Copilot without giant arrays or expensive recomputations."""
     if override:
         return override
 
@@ -89,16 +73,49 @@ def _build_context(override: Optional[Dict] = None) -> Dict:
     if G is None:
         return {"status": "no_graph_loaded"}
 
-    metrics = compute_graph_metrics(G)
-    centrality = compute_betweenness(G, k=min(100, G.number_of_nodes()))
-    top_nodes = sorted(centrality.items(), key=lambda x: x[1], reverse=True)[:10]
+    from app.graph_pipeline.metrics import compute_graph_metrics
+    metrics = compute_graph_metrics(G, fast=True)
 
-    return {
+    # Base topology summary
+    ctx = {
         "graph_loaded": True,
-        "metrics": metrics,
-        "top_gatekeeper_nodes": [
-            {"node_id": str(nid), "centrality": round(score, 4), **G.nodes[nid]}
-            for nid, score in top_nodes
-        ],
-        "simulation": GraphStore.get_last_simulation(),
+        "metrics": {
+            "num_nodes": metrics.get("num_nodes"),
+            "num_edges": metrics.get("num_edges"),
+        }
     }
+
+    # If there is an active flood result, append its aggregate metrics
+    flood = GraphStore.get_last_flood_result()
+    if flood:
+        data_type = flood.get("data_type", "FLOOD_SIMULATION")
+        ctx["active_scenario"] = data_type
+        # Key is "water_level" (no _m suffix) — set by both flood and temporal endpoints
+        ctx["water_level_m"] = flood.get("water_level")
+        ctx["flooded_nodes_count"] = flood.get("flooded_nodes_count")
+        ctx["road_length_flooded_km"] = flood.get("road_length_flooded_km")
+        ctx["wards_affected"] = flood.get("wards_affected")
+        ctx["hospitals_in_flood_zone"] = flood.get("hospitals_in_flood_zone")
+        ctx["rainfall_rate_mm_h"] = flood.get("rainfall_rate_mm_h")
+        # Population: stored as int in GraphStore
+        pop_val = flood.get("population_in_flood_zone")
+        if pop_val is not None:
+            ctx["population_estimate"] = pop_val if isinstance(pop_val, int) else pop_val.get("value") if isinstance(pop_val, dict) else pop_val
+        if flood.get("scenario"):
+            ctx["scenario_name"] = flood.get("scenario")
+
+    # If there is accessibility/resilience impact, append it
+    acc = GraphStore.get_last_accessibility_impact()
+    if acc:
+        ctx["accessibility"] = acc.get("facilities", {})
+        ctx["resilience_index"] = acc.get("resilience_index")
+
+    # If historical scenario is loaded, append its facts
+    sim = GraphStore.get_last_simulation()
+    if sim and sim.get("type") == "historical":
+        ctx["active_scenario"] = "Historical Disaster: " + sim.get("scenario_id", "")
+        ctx["historical_facts"] = sim.get("observed_historical_facts")
+        ctx["limitations"] = sim.get("model_limitations")
+
+    return ctx
+

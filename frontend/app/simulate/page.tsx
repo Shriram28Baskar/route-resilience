@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, RotateCcw, GitMerge, Navigation, AlertTriangle, ChevronDown, ChevronUp, Lightbulb, TrendingUp, ShieldAlert } from "lucide-react";
 import {
@@ -8,16 +8,23 @@ import {
   getRecommendations, simulateInvestment, getFragilityCurve, runScenarios,
   simulateFlood, getReliefCamps, getEquityMetrics, getTrafficImpact, getDegradationForecast,
   getGraphGeoJSON, compareAblation, prescribeAblation, getVulnerability,
+  fetchFloodAccessibilityImpact, fetchWardReport, runRainfallBacktest, fetchCurrentWeather,
+  fetchHistoricalScenario,
 } from "@/lib/api";
 import type {
   AblationResponse, CriticalityResponse, Recommendation, FragilityResponse,
   MultiScenarioResponse, EquityMetricsResponse, TrafficImpactResponse,
-  DegradationForecastResponse, AblateCompareResponse, PrescribeResponse, VulnerabilityResponse
+  DegradationForecastResponse, AblateCompareResponse, PrescribeResponse, VulnerabilityResponse,
+  FloodAccessibilityResponse, WardReportResponse, BacktestResponse, WeatherData,
+  HistoricalScenarioResponse,
 } from "@/lib/api";
+
 import { resilienceColor, centralityColor, formatDistance, formatDuration } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, ReferenceLine, CartesianGrid, Legend } from "recharts";
 import { Waves, Tent } from "lucide-react";
 import { Users, Car, TrendingDown } from "lucide-react";
+import HistoricalScenarioResults from "@/components/HistoricalScenarioResults";
+
 
 type Tab = "ablate" | "route" | "scenarios" | "flood" | "traffic";
 
@@ -51,24 +58,60 @@ export default function SimulatePage() {
   const [isPlayingFlood, setIsPlayingFlood] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [numCamps, setNumCamps] = useState(3);
+  const [floodImpact, setFloodImpact] = useState<FloodAccessibilityResponse | null>(null);
+  const [wardReport, setWardReport] = useState<WardReportResponse | null>(null);
+  const [backtest, setBacktest] = useState<BacktestResponse | null>(null);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [backtestLoading, setBacktestLoading] = useState(false);
+  const [alertSent, setAlertSent] = useState(false);
+  const [historicalScenario, setHistoricalScenario] = useState<HistoricalScenarioResponse | null>(null);
+  const [historicalLoading, setHistoricalLoading] = useState(false);
 
+
+  // Ref to signal the async animation loop to stop when pause is hit
+  const floodAnimRef = useRef(false);
+
+  // Start/stop the async flood animation loop
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlayingFlood) {
-      interval = setInterval(() => {
-        setWaterLevel(prev => {
-          if (prev >= elevationBounds.max) {
-            setIsPlayingFlood(false);
-            return prev;
-          }
-          return prev + 1;
-        });
-      }, 500);
+    if (!isPlayingFlood) {
+      floodAnimRef.current = false; // signal any running loop to stop
+      return;
     }
-    return () => clearInterval(interval);
-  }, [isPlayingFlood, elevationBounds.max]);
 
+    floodAnimRef.current = true;
+
+    const runAnimation = async () => {
+      let level = waterLevel;
+      while (floodAnimRef.current && level < elevationBounds.max) {
+        level += 1;
+        setWaterLevel(level);
+        setIsSyncing(true);
+        try {
+          const res = await simulateFlood(level);
+          setFlood(res);
+          if (res.elevation_bounds) setElevationBounds(res.elevation_bounds);
+        } catch (e: any) {
+          setError(e.message);
+          floodAnimRef.current = false;
+        } finally {
+          setIsSyncing(false);
+        }
+        // Small pause between frames so the map has time to render
+        await new Promise(r => setTimeout(r, 150));
+      }
+      // Animation reached the top or was cancelled
+      setIsPlayingFlood(false);
+      floodAnimRef.current = false;
+    };
+
+    runAnimation();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlayingFlood]);
+
+  // When slider is moved manually (not during animation), fetch the flood data
   useEffect(() => {
+    if (isPlayingFlood) return; // animation loop handles its own fetching
     if (tab === "flood") {
       const timeout = setTimeout(() => {
         handleFlood(true);
@@ -81,6 +124,7 @@ export default function SimulatePage() {
     getCriticality(50).then(setCentrality).catch(console.error);
     getGraphGeoJSON().then(setGraphGeojson).catch(console.error);
     getVulnerability(20).then(setVulnData).catch(console.error);
+    fetchCurrentWeather().then(setWeather).catch(console.error);
   }, []);
 
   const handleAblate = async () => {
@@ -156,7 +200,7 @@ export default function SimulatePage() {
       // HYBRID MATRIX: If the user built a custom disaster (via Ablation or Flood), add it to the comparison matrix!
       const customAblated = [
         ...(ablation?.ablated_nodes || []),
-        ...(cascade?.cascade_steps?.flatMap(s => s.ablated_nodes) || []),
+        ...(cascade?.cascade_steps?.flatMap((s: any) => s.ablated_nodes) || []),
         ...(flood?.ablated_nodes || [])
       ].filter(Boolean);
 
@@ -204,6 +248,48 @@ export default function SimulatePage() {
     finally { setLoading(false); }
   };
 
+  const handleFloodImpact = async () => {
+    if (!flood?.ablated_nodes?.length) return;
+    setImpactLoading(true); setError(null);
+    try {
+      const [impact, ward] = await Promise.all([
+        fetchFloodAccessibilityImpact(flood.ablated_nodes),
+        fetchWardReport(flood.ablated_nodes),
+      ]);
+      setFloodImpact(impact);
+      setWardReport(ward);
+    } catch (e: any) { setError(e.message); }
+    finally { setImpactLoading(false); }
+  };
+
+  const handleBacktest = async () => {
+    setBacktestLoading(true); setError(null);
+    try {
+      const res = await runRainfallBacktest(0, 365);
+      setBacktest(res);
+    } catch (e: any) { setError(e.message); }
+    finally { setBacktestLoading(false); }
+  };
+
+  const handleWeather = async () => {
+    try {
+      const w = await fetchCurrentWeather();
+      setWeather(w);
+    } catch (e: any) { console.error(e); }
+  };
+
+  const handleHistoricalScenario = async () => {
+    setHistoricalLoading(true); setError(null);
+    try {
+      const res = await fetchHistoricalScenario("bengaluru_2022_urban_flood");
+      setHistoricalScenario(res);
+      // Also sync the water level slider to the scenario level
+      setWaterLevel(Math.round(res.model_inputs.scenario_water_level_m));
+    } catch (e: any) { setError(e.message); }
+    finally { setHistoricalLoading(false); }
+  };
+
+
   const handleSocialImpact = async () => {
     setLoading(true); setError(null);
     try {
@@ -241,7 +327,7 @@ export default function SimulatePage() {
     finally { setLoading(false); }
   };
 
-  const reset = () => { setAblation(null); setCascade(null); setRoute(null); setRecommendations(null); setInvestmentSim(null); setFragility(null); setScenarios(null); setFlood(null); setRelief(null); setEquityMetrics(null); setTrafficImpact(null); setDegradation(null); setError(null); setSelectedNodes([]); setSrcNode(""); setTgtNode(""); };
+  const reset = () => { setAblation(null); setCascade(null); setRoute(null); setRecommendations(null); setInvestmentSim(null); setFragility(null); setScenarios(null); setFlood(null); setRelief(null); setEquityMetrics(null); setTrafficImpact(null); setDegradation(null); setFloodImpact(null); setWardReport(null); setBacktest(null); setAlertSent(false); setHistoricalScenario(null); setError(null); setSelectedNodes([]); setSrcNode(""); setTgtNode(""); };
 
   const handleMapClick = (nodeId: string) => {
     if (["ablate", "traffic"].includes(tab)) {
@@ -403,6 +489,39 @@ export default function SimulatePage() {
                 <input type="range" min={Math.floor(elevationBounds.min)} max={Math.ceil(elevationBounds.max)} step={1} value={waterLevel} onChange={e => { setWaterLevel(+e.target.value); setIsPlayingFlood(false); }} className="w-full accent-[#00E5B4]" />
                 <div className="text-white text-center mt-2 font-mono">{waterLevel}m</div>
                 <p className="text-xs text-[#6B7280] mt-4 text-center">Slide to simulate rising floodwaters. Any road below this elevation will fail.</p>
+                {flood?.ablated_nodes?.length > 0 && (
+                  <button
+                    onClick={handleFloodImpact}
+                    disabled={impactLoading}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#FF4444]/10 border border-[#FF4444]/30 text-[#FF4444] font-bold rounded-xl hover:bg-[#FF4444]/20 transition-colors disabled:opacity-50 text-sm mt-3"
+                  >
+                    {impactLoading
+                      ? <span className="w-4 h-4 border-2 border-[#FF4444]/30 border-t-[#FF4444] rounded-full animate-spin" />
+                      : <ShieldAlert className="w-4 h-4" />}
+                    {impactLoading ? "Analysing impact…" : "Run Full Impact Analysis"}
+                  </button>
+                )}
+                <button
+                  onClick={handleBacktest}
+                  disabled={backtestLoading}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white/5 border border-white/8 text-[#6B7280] hover:text-white rounded-xl transition-colors disabled:opacity-50 text-xs mt-2"
+                >
+                  {backtestLoading
+                    ? <span className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    : <span>📊</span>}
+                  {backtestLoading ? "Loading IMD data…" : "Historical Backtest (IMD 2023)"}
+                </button>
+                <button
+                  onClick={handleHistoricalScenario}
+                  disabled={historicalLoading}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold rounded-xl hover:bg-amber-500/20 transition-colors disabled:opacity-50 text-xs mt-2"
+                >
+                  {historicalLoading
+                    ? <span className="w-3 h-3 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                    : <span>🗓</span>}
+                  {historicalLoading ? "Running 2022 scenario…" : "Load: 2022 Bengaluru Flood (Sept 5)"}
+                </button>
+
               </div>
             )}
 
@@ -459,7 +578,7 @@ export default function SimulatePage() {
             {/* Run button */}
             {tab !== "flood" && (
               <button
-                onClick={tab === "ablate" ? handleAblate : tab === "route" ? handleRoute : tab === "flood" ? handleFlood : tab === "traffic" ? handleTrafficImpact : handleScenarios}
+                onClick={tab === "ablate" ? handleAblate : tab === "route" ? handleRoute : tab === "traffic" ? handleTrafficImpact : handleScenarios}
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#00E5B4] text-[#0B0F1A] font-display font-bold rounded-xl hover:bg-[#00B38A] transition-colors disabled:opacity-50"
               >
@@ -501,6 +620,12 @@ export default function SimulatePage() {
               handleSimulateInvestment={handleSimulateInvestment}
               loading={loading}
               isSyncing={isSyncing}
+              floodImpact={floodImpact}
+              wardReport={wardReport}
+              backtest={backtest}
+              weather={weather}
+              handleWeather={handleWeather}
+              historicalScenario={historicalScenario}
             />
           </div>
         </div>
@@ -515,7 +640,7 @@ import dynamic from "next/dynamic";
 
 const RoadMap = dynamic(() => import("@/components/RoadMap"), { ssr: false });
 
-function SimulateResults({ tab, result, ablation, cascade, route, centrality, graphGeojson, srcNode, tgtNode, selectedNodes, onMapClick, recommendations, investmentSim, fragility, scenarios, flood, relief, equityMetrics, trafficImpact, degradation, handleSimulateInvestment, loading, vulnerability, isSyncing }: any) {
+function SimulateResults({ tab, result, ablation, cascade, route, centrality, graphGeojson, srcNode, tgtNode, selectedNodes, onMapClick, recommendations, investmentSim, fragility, scenarios, flood, relief, equityMetrics, trafficImpact, degradation, handleSimulateInvestment, loading, vulnerability, isSyncing, floodImpact, wardReport, backtest, weather, handleWeather, historicalScenario }: any) {
   const [activeRoute, setActiveRoute] = useState<string>("optimal");
 
   return (
@@ -603,8 +728,15 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
                   <div className="bg-[#0B0F1A] border border-white/8 rounded-lg p-4">
                     <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1 flex items-center gap-1"><Users className="w-3 h-3"/> Population Affected</div>
                     <div className="font-mono text-2xl font-bold text-[#FFB400]">
-                      {flood.impact_metrics.population_affected.toLocaleString()}
+                      {flood.impact_metrics.population_affected > 0 
+                        ? flood.impact_metrics.population_affected.toLocaleString() 
+                        : <span className="text-sm text-[#6B7280]">NO DATA</span>}
                     </div>
+                    {flood.impact_metrics.population_source && flood.impact_metrics.population_affected > 0 && (
+                      <div className="text-[9px] text-[#6B7280] mt-1 truncate" title={flood.impact_metrics.population_source}>
+                        src: WorldPop 2020
+                      </div>
+                    )}
                   </div>
                   <div className="bg-[#0B0F1A] border border-white/8 rounded-lg p-4">
                     <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1 flex items-center gap-1"><TrendingDown className="w-3 h-3"/> Damage Estimate</div>
@@ -627,6 +759,27 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
                 </div>
               )}
             </div>
+          </motion.div>
+        )}
+        {tab === "flood" && floodImpact && (
+          <motion.div key="floodimpact" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <FloodImpactResults data={floodImpact} wardReport={wardReport} />
+          </motion.div>
+        )}
+        {tab === "flood" && backtest && (
+          <motion.div key="backtest" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <BacktestResults data={backtest} />
+          </motion.div>
+        )}
+        {tab === "flood" && historicalScenario && (
+          <motion.div key="historical" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <HistoricalScenarioResults data={historicalScenario} />
+          </motion.div>
+        )}
+
+        {tab === "flood" && weather && (
+          <motion.div key="weather" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <WeatherWidget data={weather} onRefresh={handleWeather} />
           </motion.div>
         )}
         {tab === "route" && relief && (
@@ -1988,33 +2141,276 @@ function SocialImpactResults({ data }: { data: EquityMetricsResponse }) {
   );
 }
 
+// ── Step 4-6: Flood Impact Results ────────────────────────────────────────────
+function FloodImpactResults({ data, wardReport }: { data: any; wardReport: any }) {
+  const SEVERITY_COLOR: Record<string, string> = {
+    critical: "#FF4444", high: "#FFB400", moderate: "#FFB400", low: "#00E5B4",
+  };
+  const facilities = [
+    { key: "hospitals", label: "Hospitals / Clinics", icon: "🏥", color: "#FF4444" },
+    { key: "fire_stations", label: "Fire Stations", icon: "🚒", color: "#FFB400" },
+    { key: "police", label: "Police Stations", icon: "🚔", color: "#0099FF" },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="bg-[#111827] border border-[#FF4444]/30 rounded-xl p-5">
+        <h3 className="font-display font-semibold text-[#FF4444] flex items-center gap-2 mb-4">
+          <ShieldAlert className="w-4 h-4" /> Emergency Accessibility Impact
+        </h3>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-[#0B0F1A] rounded-lg p-3 text-center">
+            <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1">Population</div>
+            <div className="font-mono text-lg font-bold text-[#FFB400]">{(data.population?.affected ?? 0).toLocaleString()}</div>
+            <div className="text-[9px] text-[#6B7280] mt-1">WorldPop 2020</div>
+          </div>
+          <div className="bg-[#0B0F1A] rounded-lg p-3 text-center">
+            <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1">Road Flooded</div>
+            <div className="font-mono text-lg font-bold text-[#0099FF]">{data.flood_summary?.road_length_flooded_km?.toFixed(1)} km</div>
+            <div className="text-[9px] text-[#6B7280] mt-1">OSM edges</div>
+          </div>
+          <div className="bg-[#0B0F1A] rounded-lg p-3 text-center">
+            <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1">Wards Hit</div>
+            <div className="font-mono text-lg font-bold text-[#FF4444]">{data.ward_breakdown?.total_wards_affected}</div>
+            <div className="text-[9px] text-[#6B7280] mt-1">BBMP wards</div>
+          </div>
+        </div>
+        <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-2">Most Affected Wards</div>
+        <div className="flex flex-wrap gap-1.5">
+          {(data.ward_breakdown?.top_affected_wards ?? []).slice(0, 8).map((w: any) => (
+            <span key={w.ward} className="px-2 py-0.5 bg-[#FF4444]/10 border border-[#FF4444]/20 rounded text-xs text-[#FF4444] font-mono">
+              {w.ward} <span className="text-[#6B7280]">({w.flooded_nodes})</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {facilities.map(({ key, label, icon, color }) => {
+        const f = data.facility_impact?.[key];
+        if (!f) return null;
+        return (
+          <div key={key} className="bg-[#111827] border border-white/8 rounded-xl p-5" style={{ borderColor: color + "30" }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">{icon}</span>
+                <span className="font-semibold text-sm" style={{ color }}>{label}</span>
+              </div>
+              <div className="flex gap-2 text-xs">
+                <span className="bg-[#FF4444]/10 text-[#FF4444] px-2 py-0.5 rounded font-mono">{f.facilities_flooded} flooded</span>
+                <span className="bg-[#00E5B4]/10 text-[#00E5B4] px-2 py-0.5 rounded font-mono">{f.facilities_intact} intact</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="bg-[#0B0F1A] rounded-lg p-3">
+                <div className="text-[9px] text-[#6B7280] uppercase tracking-widest mb-1">Nodes Lost 15-min Access</div>
+                <div className="font-mono text-xl font-bold text-[#FF4444]">{(f.impact?.nodes_lost_15min_access ?? 0).toLocaleString()}</div>
+              </div>
+              <div className="bg-[#0B0F1A] rounded-lg p-3">
+                <div className="text-[9px] text-[#6B7280] uppercase tracking-widest mb-1">Avg Travel Time Increase</div>
+                <div className="font-mono text-xl font-bold text-[#FFB400]">+{f.impact?.avg_travel_time_increase_min?.toFixed(1)} min</div>
+              </div>
+            </div>
+            {f.best_alternative_route && (
+              <div className="bg-[#00E5B4]/5 border border-[#00E5B4]/20 rounded-lg p-3">
+                <div className="text-[9px] text-[#00E5B4] uppercase tracking-widest mb-1">✓ Alternative Route Found</div>
+                <div className="text-xs text-white font-mono">
+                  {f.best_alternative_route.distance_m?.toFixed(0)} m · {f.best_alternative_route.travel_time_min?.toFixed(1)} min
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {wardReport && (
+        <div className="bg-[#111827] border border-white/8 rounded-xl p-5">
+          <h3 className="font-display font-semibold text-sm text-[#6B7280] uppercase tracking-widest mb-3">Ward-Level Report (BBMP)</h3>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="text-center">
+              <div className="font-mono text-2xl font-bold text-[#FF4444]">{wardReport.summary?.wards_critical ?? 0}</div>
+              <div className="text-[10px] text-[#6B7280] mt-1">Critical Wards (≥60%)</div>
+            </div>
+            <div className="text-center">
+              <div className="font-mono text-2xl font-bold text-[#FFB400]">{wardReport.summary?.wards_high ?? 0}</div>
+              <div className="text-[10px] text-[#6B7280] mt-1">High Impact (≥30%)</div>
+            </div>
+            <div className="text-center">
+              <div className="font-mono text-2xl font-bold text-white">{(wardReport.summary?.total_census_pop_in_affected_wards ?? 0).toLocaleString()}</div>
+              <div className="text-[10px] text-[#6B7280] mt-1">Census Pop (2011)</div>
+            </div>
+          </div>
+          <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+            {(wardReport.ward_reports ?? []).slice(0, 20).map((w: any) => (
+              <div key={w.ward_name} className="flex items-center gap-3 px-3 py-2 bg-[#0B0F1A] rounded-lg">
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: SEVERITY_COLOR[w.severity] ?? "#6B7280" }} />
+                <div className="flex-1 text-xs text-white truncate">{w.ward_name}</div>
+                <div className="text-xs font-mono text-[#6B7280]">{w.flood_fraction_pct}%</div>
+                <div className="text-[10px] font-semibold" style={{ color: SEVERITY_COLOR[w.severity] }}>{w.severity}</div>
+              </div>
+            ))}
+          </div>
+          <div className="text-[9px] text-[#6B7280] mt-3">Population: BBMP 2011 Census · Flood: SRTMGL1 30m DEM</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Step 7: Historical Rainfall Backtest ──────────────────────────────────────
+function BacktestResults({ data }: { data: any }) {
+  const summary = data?.validation_summary;
+  const events = data?.events ?? [];
+  const chartData = events.map((e: any) => ({
+    date: e.date?.slice(5),
+    rainfall: +e.rainfall_mm?.toFixed(1),
+    flooded: e.flood_result?.flooded_nodes ?? 0,
+  }));
+  return (
+    <div className="bg-[#111827] border border-white/8 rounded-xl p-5">
+      <h3 className="font-display font-semibold text-sm text-[#6B7280] uppercase tracking-widest mb-1">
+        Historical Rainfall Backtest (IMD 2023)
+      </h3>
+      <p className="text-xs text-[#6B7280] mb-4">Bengaluru Urban · IMD GRID MODEL daily records</p>
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="bg-[#0B0F1A] rounded-lg p-3 text-center">
+          <div className="font-mono text-xl font-bold text-[#00E5B4]">{summary?.total_events_backtested ?? 0}</div>
+          <div className="text-[10px] text-[#6B7280] mt-1">Events Backtested</div>
+        </div>
+        <div className="bg-[#0B0F1A] rounded-lg p-3 text-center">
+          <div className="font-mono text-xl font-bold text-[#FFB400]">{summary?.avg_ward_overlap_score_pct ?? 0}%</div>
+          <div className="text-[10px] text-[#6B7280] mt-1">Avg Ward Match</div>
+        </div>
+        <div className="bg-[#0B0F1A] rounded-lg p-3 text-center">
+          <div className={`font-mono text-xl font-bold ${summary?.monotonicity_check === "PASS" ? "text-[#00E5B4]" : "text-[#FF4444]"}`}>
+            {summary?.monotonicity_check === "PASS" ? "✓ PASS" : "✗ FAIL"}
+          </div>
+          <div className="text-[10px] text-[#6B7280] mt-1">Monotonicity</div>
+        </div>
+      </div>
+      {chartData.length > 0 && (
+        <ResponsiveContainer width="100%" height={130}>
+          <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+            <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#6B7280" }} />
+            <YAxis tick={{ fontSize: 9, fill: "#6B7280" }} />
+            <Tooltip
+              contentStyle={{ background: "#111827", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11 }}
+              formatter={(v: any, name: string) => [v, name === "rainfall" ? "Rainfall (mm)" : "Flooded Nodes"]}
+            />
+            <Bar dataKey="rainfall" name="rainfall" fill="#0099FF" opacity={0.7} radius={[2, 2, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+      <div className="mt-3 space-y-1">
+        {(summary?.model_limitations ?? []).slice(0, 2).map((l: string, i: number) => (
+          <div key={i} className="text-[9px] text-[#6B7280]">⚠ {l}</div>
+        ))}
+      </div>
+      <div className="text-[9px] text-[#6B7280] mt-2">Source: IMD GRID MODEL · Terrain: SRTMGL1 30m</div>
+    </div>
+  );
+}
+
+// ── Step 9: Live Weather Widget ───────────────────────────────────────────────
+function WeatherWidget({ data, onRefresh }: { data: any; onRefresh: () => void }) {
+  const RISK_COLOR: Record<string, string> = {
+    none: "#00E5B4", low: "#00E5B4", moderate: "#FFB400",
+    high: "#FF8C00", very_high: "#FF4444", extreme: "#FF2D6B",
+  };
+  const risk = data.risk?.level ?? "none";
+  const riskColor = RISK_COLOR[risk] ?? "#6B7280";
+  return (
+    <div className="bg-[#111827] border border-[#0099FF]/20 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-display font-semibold text-xs text-[#6B7280] uppercase tracking-widest">
+          🌦 Live Weather — Bengaluru
+        </h3>
+        <button onClick={onRefresh} className="text-[10px] text-[#6B7280] hover:text-white transition-colors">↻ Refresh</button>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        <div className="bg-[#0B0F1A] rounded-lg p-2 text-center">
+          <div className="font-mono text-lg font-bold text-white">{data.temperature_c?.toFixed(1)}°C</div>
+          <div className="text-[9px] text-[#6B7280] mt-0.5">Temp</div>
+        </div>
+        <div className="bg-[#0B0F1A] rounded-lg p-2 text-center">
+          <div className="font-mono text-lg font-bold text-[#0099FF]">{data.humidity_pct}%</div>
+          <div className="text-[9px] text-[#6B7280] mt-0.5">Humidity</div>
+        </div>
+        <div className="bg-[#0B0F1A] rounded-lg p-2 text-center">
+          <div className="font-mono text-lg font-bold text-[#FFB400]">{data.current_rainfall_1h_mm?.toFixed(1)} mm</div>
+          <div className="text-[9px] text-[#6B7280] mt-0.5">Rain 1h</div>
+        </div>
+        <div className="bg-[#0B0F1A] rounded-lg p-2 text-center">
+          <div className="font-mono text-sm font-bold uppercase" style={{ color: riskColor }}>{risk}</div>
+          <div className="text-[9px] text-[#6B7280] mt-0.5">Flood Risk</div>
+        </div>
+      </div>
+      <div className="text-[9px] text-[#6B7280] mt-2">OWM · {data.description} · {data.source}</div>
+    </div>
+  );
+}
 // ── Traffic Impact Results ────────────────────────────────────────────────────
+
+function useCountUp(target: number, durationMs: number = 2500) {
+  const [displayed, setDisplayed] = useState(0);
+  useEffect(() => {
+    if (target <= 0) { setDisplayed(0); return; }
+    setDisplayed(0);
+    const startTime = performance.now();
+    const tick = () => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(elapsed / durationMs, 1);
+      // Cubic ease-out: fast start, slows at end
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayed(Math.round(eased * target));
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [target, durationMs]);
+  return displayed;
+}
 
 function TrafficImpactResults({ data }: { data: TrafficImpactResponse }) {
   const fmt = (n: number) => n.toLocaleString("en-IN");
   const fmtCr = (n: number) => n >= 10_000_000 ? `₹${(n/10_000_000).toFixed(2)} Cr` : n >= 100_000 ? `₹${(n/100_000).toFixed(1)} L` : `₹${fmt(n)}`;
+
+  // Animated tickers
+  const animatedTotal = useCountUp(data.total_economic_loss_inr);
+  const animatedWage  = useCountUp(data.wage_loss_inr, 2000);
+  const animatedFuel  = useCountUp(data.fuel_loss_inr, 2200);
+
   return (
     <div className="space-y-4">
-      <div className="bg-[#111827] border border-[#FF4444]/30 rounded-xl p-6">
-        <div className="text-xs text-[#6B7280] mb-1 uppercase tracking-widest">Total Economic Loss (Single Disruption Day)</div>
-        <div className="font-display text-5xl font-bold text-[#FF4444]">{fmtCr(data.total_economic_loss_inr)}</div>
-        <div className="text-xs text-[#6B7280] mt-2">Annual projection if sustained: <span className="text-[#FFB400] font-semibold">{fmtCr(data.annual_loss_projection_inr)}</span></div>
+      {/* ── Live Damage Ticker ── */}
+      <div className="bg-[#111827] border border-[#FF4444]/40 rounded-xl p-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-[#FF4444]/5 to-transparent pointer-events-none" />
+        <div className="text-xs text-[#6B7280] mb-1 uppercase tracking-widest flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-[#FF4444] animate-pulse" />
+          Economic Damage Accumulating — Single Disruption Day
+        </div>
+        <div className="font-display text-5xl font-bold text-[#FF4444] tabular-nums transition-all">
+          {fmtCr(animatedTotal)}
+        </div>
+        <div className="text-xs text-[#6B7280] mt-2">
+          Annual projection if sustained:{" "}
+          <span className="text-[#FFB400] font-semibold">{fmtCr(data.annual_loss_projection_inr)}</span>
+        </div>
       </div>
+
       <div className="grid grid-cols-2 gap-4">
         {[
-          { label: "Affected Daily Trips",      value: fmt(data.affected_daily_trips),             color: "#FFB400" },
-          { label: "Extra Min / Commuter",       value: `${data.extra_minutes_per_commuter} min`,   color: "#FFB400" },
-          { label: "Person-Days Lost",           value: fmt(Math.round(data.person_days_lost)),     color: "#FF4444" },
-          { label: "Unreachable Trip Pairs",     value: `${data.unreachable_trip_pairs_pct}%`,      color: "#FF4444" },
-          { label: "Wage Loss",                  value: fmtCr(data.wage_loss_inr),                  color: "#D1D5DB" },
-          { label: "Fuel & Vehicle Loss",        value: fmtCr(data.fuel_loss_inr),                  color: "#D1D5DB" },
+          { label: "Affected Daily Trips",  value: fmt(data.affected_daily_trips),         color: "#FFB400" },
+          { label: "Extra Min / Commuter",  value: `${data.extra_minutes_per_commuter} min`, color: "#FFB400" },
+          { label: "Person-Days Lost",      value: fmt(Math.round(data.person_days_lost)), color: "#FF4444" },
+          { label: "Unreachable Trip Pairs",value: `${data.unreachable_trip_pairs_pct}%`,  color: "#FF4444" },
+          { label: "Wage Loss",             value: fmtCr(animatedWage),                    color: "#D1D5DB" },
+          { label: "Fuel & Vehicle Loss",   value: fmtCr(animatedFuel),                    color: "#D1D5DB" },
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-[#111827] border border-white/8 rounded-xl p-4">
             <div className="text-xs text-[#6B7280] mb-1">{label}</div>
-            <div className="font-display text-lg font-bold" style={{ color }}>{value}</div>
+            <div className="font-display text-lg font-bold tabular-nums" style={{ color }}>{value}</div>
           </div>
         ))}
       </div>
+
       <div className="bg-[#111827] border border-white/8 rounded-xl p-5">
         <h3 className="font-display font-semibold text-sm mb-3">Detour Analysis</h3>
         <div className="flex items-center gap-4">

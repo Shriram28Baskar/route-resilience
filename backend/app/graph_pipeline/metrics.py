@@ -79,21 +79,25 @@ def compute_graph_metrics(G: nx.Graph, fast: bool = False) -> Dict[str, Any]:
 
 def multi_source_shortest_paths(G: nx.Graph, source_nodes: List) -> Dict:
     """
-    Compute shortest path distances from every node to its nearest source node.
+    Compute shortest travel-time paths from every node to its nearest source node.
     Used for hospital accessibility analysis.
 
-    Returns dict: node_id -> {nearest_hospital_node: str, distance: float}
+    Weight: time_s (travel-time in seconds), NOT metres.
+    Hospital accessibility is a time-based concept (can I reach a hospital in < 15 min?),
+    not a physical distance concept.
+
+    Returns dict: node_id -> {nearest_hospital_node: str, travel_time_s: float}
     """
     valid_sources = [s for s in source_nodes if s in G]
     if not valid_sources:
         return {}
 
     try:
-        distances, paths = nx.multi_source_dijkstra(G, valid_sources, weight="weight")
+        distances, paths = nx.multi_source_dijkstra(G, valid_sources, weight="time_s")
         result = {
             node: {
                 "nearest_hospital_node": str(paths[node][0]),
-                "distance": dist,
+                "travel_time_s": round(dist, 2),
             }
             for node, dist in distances.items()
         }
@@ -102,6 +106,7 @@ def multi_source_shortest_paths(G: nx.Graph, source_nodes: List) -> Dict:
         result = {}
 
     return result
+
 
 
 def _empty_metrics() -> Dict[str, Any]:

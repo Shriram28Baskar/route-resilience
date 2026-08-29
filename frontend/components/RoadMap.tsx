@@ -5,20 +5,20 @@ import { MapContainer, TileLayer, WMSTileLayer, CircleMarker, Popup, Marker, use
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { centralityColor, findNearestNodeId } from "@/lib/utils";
-import type { CriticalityResponse, HospitalAccessibility, RouteResponse, EquityResponse, EmergencyServicesResponse } from "@/lib/api";
+import type { CriticalityResponse, HospitalAccessibility, RouteResponse, EquityResponse, EmergencyServicesResponse, AccessibilityImpactResponse } from "@/lib/api";
 
-// Vibrant categorical color palette for catchment zones
+// Premium deep-tech palette for catchment zones — cohesive, glowing, readable on dark maps
 const CATCHMENT_COLORS = [
-  "#00E5B4",  // Teal (Camp 1)
-  "#FFB400",  // Amber (Camp 2)
-  "#FF2D6B",  // Rose (Camp 3)
-  "#A855F7",  // Purple (Camp 4)
-  "#3B82F6",  // Blue (Camp 5)
-  "#F97316",  // Orange (Camp 6)
-  "#10B981",  // Emerald (Camp 7)
-  "#EC4899",  // Pink (Camp 8)
-  "#14B8A6",  // Cyan-teal (Camp 9)
-  "#F59E0B",  // Yellow (Camp 10)
+  "#06B6D4",  // Cyan (Camp 1)
+  "#8B5CF6",  // Violet (Camp 2)
+  "#F59E0B",  // Amber (Camp 3)
+  "#10B981",  // Emerald (Camp 4)
+  "#E11D48",  // Rose (Camp 5)
+  "#3B82F6",  // Blue (Camp 6)
+  "#F97316",  // Orange (Camp 7)
+  "#A78BFA",  // Lavender (Camp 8)
+  "#34D399",  // Mint (Camp 9)
+  "#FBBF24",  // Gold (Camp 10)
 ];
 
 interface RoadMapProps {
@@ -26,7 +26,7 @@ interface RoadMapProps {
   hospitals: HospitalAccessibility | null;
   emergencyServices?: EmergencyServicesResponse | null;
   equity: EquityResponse | null;
-  activeLayer: "centrality" | "hospitals" | "topology" | "route" | "simulate" | "equity" | "emergency";
+  activeLayer: "centrality" | "hospitals" | "topology" | "route" | "simulate" | "equity" | "emergency" | "impact";
   graphGeojson: GeoJSON.FeatureCollection | null;
   routeResult?: RouteResponse | null;
   srcNodeId?: string;
@@ -38,6 +38,7 @@ interface RoadMapProps {
   reliefCatchment?: Record<string, number>;
   cascadeSteps?: any[];
   activeRoute?: string;
+  impactData?: AccessibilityImpactResponse | null;
 }
 
 // Bengaluru AOI center
@@ -73,6 +74,7 @@ export default function RoadMap({
   cascadeSteps,
   activeRoute = "optimal",
   emergencyServices,
+  impactData,
 }: RoadMapProps) {
   const [theme, setTheme] = useState<"dark" | "light" | "satellite" | "bhuvan">("dark");
 
@@ -94,14 +96,14 @@ export default function RoadMap({
   const getBhuvanRoadStyle = (feature: any) => {
     const hw = feature?.properties?.highway || "";
     if (["motorway", "motorway_link", "trunk", "trunk_link"].includes(hw))
-      return { color: "#FF2D2D", weight: 3.5, opacity: 1 };       // CRITICAL – red
+      return { color: "#E11D48", weight: 3, opacity: 0.9 };        // CRITICAL – deep rose
     if (["primary", "primary_link"].includes(hw))
-      return { color: "#FF8C00", weight: 2.5, opacity: 1 };        // HIGH – orange
+      return { color: "#F97316", weight: 2.5, opacity: 0.85 };     // HIGH – burnt orange
     if (["secondary", "secondary_link"].includes(hw))
-      return { color: "#FFE600", weight: 2, opacity: 1 };          // MEDIUM – yellow
+      return { color: "#F59E0B", weight: 2, opacity: 0.8 };        // MEDIUM – amber
     if (["tertiary", "tertiary_link"].includes(hw))
-      return { color: "#00E5B4", weight: 1.5, opacity: 0.9 };      // LOW – teal
-    return { color: "#00FF7F", weight: 1, opacity: 0.5 };          // LOCAL – green
+      return { color: "#06B6D4", weight: 1.5, opacity: 0.7 };      // LOW – cyan
+    return { color: "#6366F1", weight: 1, opacity: 0.45 };         // LOCAL – indigo
   };
 
   const roadLines = graphGeojson
@@ -141,17 +143,17 @@ export default function RoadMap({
                 const clusterIdx = reliefCatchment[srcId] ?? reliefCatchment[tgtId];
                 if (clusterIdx !== undefined) {
                   const color = CATCHMENT_COLORS[clusterIdx % CATCHMENT_COLORS.length];
-                  return { color, weight: 2.5, opacity: 0.85 };
+                  return { color, weight: 2, opacity: 0.75 };
                 }
               }
               return {
                 color: theme === "dark"
-                  ? "rgba(0, 213, 255, 0.35)"
+                  ? "rgba(99, 102, 241, 0.55)"   // indigo glow on dark
                   : theme === "light"
-                  ? "rgba(0,0,0,0.15)"
-                  : "rgba(255,255,255,0.35)",
-                weight: theme === "dark" ? 2 : 1.5,
-                opacity: 0.9,
+                  ? "rgba(30, 41, 59, 0.25)"     // slate on light
+                  : "rgba(148, 163, 184, 0.45)", // muted slate on satellite
+                weight: theme === "dark" ? 1.5 : 1.2,
+                opacity: 1,
               };
             }}
           />
@@ -209,6 +211,11 @@ export default function RoadMap({
           <TopologyLayer graphGeojson={graphGeojson} />
         )}
 
+        {/* Accessibility Impact Layer */}
+        {activeLayer === "impact" && impactData && graphGeojson && (
+          <ImpactLayer impactData={impactData} graphGeojson={graphGeojson} />
+        )}
+
         {/* Route visualization - RENDERS LAST (ON TOP) */}
         {routeResult && <RouteLayer routeResult={routeResult} activeRoute={activeRoute} />}
 
@@ -258,11 +265,11 @@ export default function RoadMap({
           
           <div style={{ fontSize: '9px', color: '#9CA3AF', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Road Infrastructure (Lines)</div>
           {[
-            { color: '#FF2D2D', label: 'Motorway / Expressway', tier: 'CRITICAL' },
-            { color: '#FF8C00', label: 'Primary Artery', tier: 'HIGH' },
-            { color: '#FFE600', label: 'Secondary Road', tier: 'MEDIUM' },
-            { color: '#00E5B4', label: 'Tertiary Road', tier: 'LOW' },
-            { color: '#00FF7F', label: 'Local / Residential', tier: 'MINIMAL' },
+            { color: '#E11D48', label: 'Motorway / Expressway', tier: 'CRITICAL' },
+            { color: '#F97316', label: 'Primary Artery', tier: 'HIGH' },
+            { color: '#F59E0B', label: 'Secondary Road', tier: 'MEDIUM' },
+            { color: '#06B6D4', label: 'Tertiary Road', tier: 'LOW' },
+            { color: '#6366F1', label: 'Local / Residential', tier: 'MINIMAL' },
           ].map(({ color, label, tier }) => (
             <div key={tier} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <div style={{ width: '24px', height: '3px', background: color, borderRadius: '2px', flexShrink: 0 }} />
@@ -338,7 +345,7 @@ function ArticulationLayer({ centrality, graphGeojson }: { centrality: Criticali
   if (!graphGeojson) return null;
 
   const warningIcon = L.divIcon({
-    html: `<div style="width:12px;height:12px;background:#FF4444;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(255, 68, 68, 0.6);"></div>`,
+    html: `<div style="width:12px;height:12px;background:#E11D48;border-radius:50%;border:2px solid rgba(255,255,255,0.8);box-shadow:0 0 10px rgba(225,29,72,0.8);"></div>`,
     className: "",
     iconSize: [12, 12],
     iconAnchor: [6, 6],
@@ -375,7 +382,7 @@ function ArticulationLayer({ centrality, graphGeojson }: { centrality: Criticali
 
 function HospitalLayer({ hospitals }: { hospitals: HospitalAccessibility }) {
   const hospitalIcon = L.divIcon({
-    html: `<div style="width:24px;height:24px;background:#00E5B4;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;color:#0B0F1A;border:2px solid #fff;">H</div>`,
+    html: `<div style="width:24px;height:24px;background:#06B6D4;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;color:#0B0F1A;border:2px solid rgba(255,255,255,0.9);box-shadow:0 0 12px rgba(6,182,212,0.7);">H</div>`,
     className: "",
     iconSize: [24, 24],
     iconAnchor: [12, 12],
@@ -400,38 +407,41 @@ function HospitalLayer({ hospitals }: { hospitals: HospitalAccessibility }) {
 // ── Emergency Layer ───────────────────────────────────────────────────────────
 
 function EmergencyLayer({ emergencyServices, graphGeojson }: { emergencyServices: EmergencyServicesResponse, graphGeojson: GeoJSON.FeatureCollection | null }) {
-  const getIcon = (amenity: string) => {
-    let emoji = "🚨";
-    if (amenity === "fire_station") emoji = "🚒";
-    if (amenity === "police") emoji = "🚓";
-    return L.divIcon({
-      html: `<div style="font-size: 24px; filter: drop-shadow(0 0 4px rgba(0,0,0,0.8)); text-align: center;">${emoji}</div>`,
-      className: "",
-      iconSize: [24, 24],
-      iconAnchor: [12, 12],
-    });
-  };
-
   return (
     <>
-      {/* Emergency Stations */}
-      {emergencyServices.facilities.map((fac, idx) => (
-        <Marker
-          key={idx}
-          position={[fac.lat, fac.lon]}
-          icon={getIcon(fac.amenity)}
-        >
-          <Popup className="custom-popup">
-            <div className="p-2">
-              <strong className="font-semibold block text-gray-800">{fac.name || "Emergency Station"}</strong>
-              <span className="text-gray-500 text-xs uppercase">{fac.amenity.replace("_", " ")}</span>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+      {emergencyServices.facilities.map((fac, idx) => {
+        const isFireStation = fac.amenity === "fire_station";
+        const color = isFireStation ? "#FF8C00" : "#0099FF";
+        const glowColor = isFireStation ? "rgba(255,140,0,0.6)" : "rgba(0,153,255,0.6)";
+        const label = isFireStation ? "🚒 FIRE" : "🚔 POLICE";
+        return (
+          <CircleMarker
+            key={idx}
+            center={[fac.lat, fac.lon]}
+            radius={isFireStation ? 10 : 8}
+            pathOptions={{
+              color,
+              fillColor: color,
+              fillOpacity: 0.85,
+              weight: 2,
+            }}
+          >
+            <Popup>
+              <div style={{ fontFamily: "monospace", fontSize: "12px", minWidth: "160px" }}>
+                <div style={{ fontWeight: 700, color, marginBottom: "4px" }}>{label}</div>
+                <div style={{ fontWeight: 600, color: "#111827" }}>{fac.name || "Emergency Station"}</div>
+                <div style={{ color: "#6B7280", fontSize: "10px", textTransform: "uppercase", marginTop: "2px" }}>
+                  {fac.amenity.replace("_", " ")}
+                </div>
+              </div>
+            </Popup>
+          </CircleMarker>
+        );
+      })}
     </>
   );
 }
+
 
 // ── Equity Layer ──────────────────────────────────────────────────────────────
 
@@ -495,8 +505,8 @@ function TopologyLayer({ graphGeojson }: { graphGeojson: GeoJSON.FeatureCollecti
         return L.circleMarker(latlng, {
           radius: 1.5,
           color: "transparent",
-          fillColor: "#00E5B4",
-          fillOpacity: 0.6,
+          fillColor: "#818CF8",
+          fillOpacity: 0.55,
           weight: 15,
         });
       }}
@@ -531,7 +541,7 @@ function SelectedNodesLayer({ selectedNodes, graphGeojson }: { selectedNodes: st
           key={n.id}
           center={[n.lat, n.lon]}
           radius={6}
-          pathOptions={{ color: "#FF4444", fillColor: "#FF4444", fillOpacity: 0.8, weight: 2 }}
+          pathOptions={{ color: "#E11D48", fillColor: "#E11D48", fillOpacity: 0.75, weight: 2, className: "" }}
         >
           <Popup>Selected Node: {n.id}</Popup>
         </CircleMarker>
@@ -579,22 +589,22 @@ function RouteLayer({ routeResult, activeRoute }: { routeResult: any, activeRout
         <GeoJSON
           key={`baseline-${routeResult.baseline.distance_m}`}
           data={routeResult.baseline.path_geojson}
-          style={{ color: "#00E5B4", weight: 4, opacity: 0.4 }}
+          style={{ color: "#F59E0B", weight: 3, opacity: 0.5 }}
         />
       )}
       {activeGeojson && (
         <>
-          {/* Thick black outline for high contrast */}
+          {/* Thick black outline for maximum contrast against any basemap */}
           <GeoJSON
             key={`active-route-bg-${activeRoute}`}
             data={activeGeojson}
-            style={{ color: "#000000", weight: 10, opacity: 0.8 }}
+            style={{ color: "#000000", weight: 11, opacity: 0.9 }}
           />
-          {/* Bright white dashed inner line */}
+          {/* Bright white dashes — universally readable on dark maps */}
           <GeoJSON
             key={`active-route-fg-${activeRoute}`}
             data={activeGeojson}
-            style={{ color: "#FFFFFF", weight: 5, opacity: 1.0, dashArray: "10, 10" }}
+            style={{ color: "#FFFFFF", weight: 5, opacity: 1.0, dashArray: "10, 8" }}
           />
         </>
       )}
@@ -616,7 +626,7 @@ function FloodLayer({ floodNodes, graphGeojson }: { floodNodes: string[], graphG
           key={`flood-${n.id}`}
           center={[n.lat, n.lon]}
           radius={5}
-          pathOptions={{ color: "transparent", fillColor: "#0099FF", fillOpacity: 0.8 }}
+          pathOptions={{ color: "rgba(56,189,248,0.6)", fillColor: "#0EA5E9", fillOpacity: 0.65, weight: 1 }}
         >
           <Popup>Flooded Node: {n.id}</Popup>
         </CircleMarker>
@@ -627,7 +637,7 @@ function FloodLayer({ floodNodes, graphGeojson }: { floodNodes: string[], graphG
 
 function ReliefCampLayer({ reliefCamps }: { reliefCamps: Array<{ id: string; lat: number; lng: number }> }) {
   const campIcon = L.divIcon({
-    html: `<div style="width:24px;height:24px;background:#00E5B4;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;color:#0B0F1A;border:2px solid #fff;">⛺</div>`,
+    html: `<div style="width:24px;height:24px;background:#8B5CF6;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;color:#fff;border:2px solid rgba(255,255,255,0.85);box-shadow:0 0 12px rgba(139,92,246,0.7);">⛺</div>`,
     className: "",
     iconSize: [24, 24],
     iconAnchor: [12, 12],
@@ -679,7 +689,7 @@ function CascadeLayer({ cascadeSteps, graphGeojson }: { cascadeSteps: any[], gra
   const allNodes = [...ablatedNodes, ...stressedNodes] as { id: string, type: 'ablated' | 'stressed', lat: number, lon: number }[];
 
   const createPulseIcon = (type: 'ablated' | 'stressed') => {
-    const color = type === 'ablated' ? '#FF4444' : '#FFB400';
+    const color = type === 'ablated' ? '#E11D48' : '#F59E0B';
     return L.divIcon({
       html: `
         <div style="position: relative; width: 24px; height: 24px;">
@@ -716,6 +726,115 @@ function CascadeLayer({ cascadeSteps, graphGeojson }: { cascadeSteps: any[], gra
           </Popup>
         </Marker>
       ))}
+    </>
+  );
+}
+
+// ── Impact Layer ──────────────────────────────────────────────────────────────
+
+function ImpactLayer({
+  impactData,
+  graphGeojson,
+}: {
+  impactData: AccessibilityImpactResponse;
+  graphGeojson: GeoJSON.FeatureCollection;
+}) {
+  const lostSet = new Set(impactData.impact.nodes_lost_access);
+  const degradedSet = new Set(impactData.impact.nodes_degraded);
+  const hospitalNodeSet = new Set(impactData.hospital_node_ids);
+  const ablatedSet = new Set(impactData.ablated_node_ids);
+
+  // Build node position lookup from GeoJSON
+  const nodePositions: Record<string, [number, number]> = {};
+  graphGeojson.features.forEach((f) => {
+    if (f.geometry.type === "Point") {
+      const id = f.properties?.id || f.properties?.node_id;
+      if (id) {
+        const [lng, lat] = (f.geometry as any).coordinates;
+        nodePositions[String(id)] = [lat, lng];
+      }
+    }
+  });
+
+  // Build alternative route GeoJSON if available
+  const altRoute = impactData.best_alternative_route;
+  const altRouteFeature =
+    altRoute?.path_geojson ?? null;
+
+  return (
+    <>
+      {/* Lost access nodes — RED */}
+      {impactData.impact.nodes_lost_access.slice(0, 2000).map((nid) => {
+        const pos = nodePositions[nid];
+        if (!pos) return null;
+        return (
+          <CircleMarker
+            key={`lost-${nid}`}
+            center={pos}
+            radius={3}
+            pathOptions={{ color: "#FF4444", fillColor: "#FF4444", fillOpacity: 0.75, weight: 0 }}
+          >
+            <Popup>
+              <div className="text-xs">
+                <div className="font-semibold text-[#FF4444]">Lost 15-min Hospital Access</div>
+                <div>Node: {nid}</div>
+              </div>
+            </Popup>
+          </CircleMarker>
+        );
+      })}
+
+      {/* Degraded access nodes — ORANGE */}
+      {impactData.impact.nodes_degraded.slice(0, 2000).map((nid) => {
+        const pos = nodePositions[nid];
+        if (!pos) return null;
+        return (
+          <CircleMarker
+            key={`deg-${nid}`}
+            center={pos}
+            radius={2.5}
+            pathOptions={{ color: "#FFB400", fillColor: "#FFB400", fillOpacity: 0.65, weight: 0 }}
+          >
+            <Popup>
+              <div className="text-xs">
+                <div className="font-semibold text-[#FFB400]">Degraded Accessibility (&gt;50% slower)</div>
+                <div>Node: {nid}</div>
+              </div>
+            </Popup>
+          </CircleMarker>
+        );
+      })}
+
+      {/* Hospital markers — TEAL */}
+      {impactData.hospitals.map((h, i) => (
+        <CircleMarker
+          key={`hosp-${i}`}
+          center={[h.lat, h.lon]}
+          radius={8}
+          pathOptions={{ color: "#00E5B4", fillColor: "#00E5B4", fillOpacity: 0.9, weight: 2 }}
+        >
+          <Popup>
+            <div className="text-xs">
+              <div className="font-semibold text-[#00E5B4]">🏥 {h.name || "Hospital"}</div>
+              <div className="text-gray-500 capitalize">{h.amenity}</div>
+            </div>
+          </Popup>
+        </CircleMarker>
+      ))}
+
+      {/* Alternative route — BLUE line */}
+      {altRouteFeature && (
+        <GeoJSON
+          key="alt-route"
+          data={altRouteFeature as any}
+          style={() => ({
+            color: "#3B82F6",
+            weight: 4,
+            opacity: 0.9,
+            dashArray: "8 4",
+          })}
+        />
+      )}
     </>
   );
 }

@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import segmentation, graph, simulation, accessibility, copilot, reports, bhuvan
+from app.api import segmentation, graph, simulation, accessibility, copilot, reports, bhuvan, alerts as alerts_router, historical, temporal
 from app.graph_pipeline.graph_build import GraphStore
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
@@ -32,6 +32,7 @@ async def lifespan(app: FastAPI):
     from app.graph_pipeline.metrics import compute_graph_metrics
 
     def precompute_osm():
+        import time
         G = GraphStore.get_osm_fallback()
         if G is not None:
             logger.info("Warmup: Starting background OSM graph metrics precompute ...")
@@ -40,18 +41,31 @@ async def lifespan(app: FastAPI):
             from app.graph_pipeline.centrality import compute_closeness, get_articulation_points, compute_edge_betweenness
             
             logger.info("Warmup: Starting background OSM betweenness centrality (k=50) precompute ...")
+            t0 = time.perf_counter()
             compute_betweenness(G, k=50)
+            elapsed_bc = time.perf_counter() - t0
+            logger.info(
+                f"Warmup: Betweenness centrality complete in {elapsed_bc:.2f}s "
+                f"[Brandes k=50, {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges]"
+            )
             
             logger.info("Warmup: Starting background OSM closeness centrality precompute ...")
             compute_closeness(G)
             
             logger.info("Warmup: Starting background OSM articulation points precompute ...")
+            t1 = time.perf_counter()
             get_articulation_points(G)
+            elapsed_ap = time.perf_counter() - t1
+            logger.info(f"Warmup: Articulation points complete in {elapsed_ap:.2f}s")
             
             logger.info("Warmup: Starting background OSM edge betweenness (k=50) precompute ...")
             compute_edge_betweenness(G, k=50)
             
-            logger.info("Warmup: Background pre-computation complete!")
+            logger.info(
+                f"Warmup: Background pre-computation complete! "
+                f"[BENCHMARK] Betweenness={elapsed_bc:.2f}s, APs={elapsed_ap:.2f}s "
+                f"on {G.number_of_nodes():,}-node Bengaluru OSM graph"
+            )
 
     threading.Thread(target=precompute_osm, daemon=True).start()
 
@@ -69,20 +83,27 @@ app = FastAPI(
 # ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        "ws://localhost:3000",   "ws://127.0.0.1:3000",
+        "http://localhost:8000", "http://127.0.0.1:8000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-app.include_router(segmentation.router, prefix="/segment",    tags=["Segmentation"])
-app.include_router(graph.router,        prefix="/graph",       tags=["Graph"])
-app.include_router(simulation.router,   prefix="/simulate",    tags=["Simulation"])
-app.include_router(accessibility.router,prefix="/accessibility",tags=["Accessibility"])
-app.include_router(copilot.router,      prefix="/copilot",     tags=["Copilot"])
-app.include_router(reports.router,      prefix="/reports",     tags=["Reports"])
-app.include_router(bhuvan.router,       prefix="/bhuvan",      tags=["Bhuvan/ISRO"])
+app.include_router(segmentation.router, prefix="/segment",           tags=["Segmentation"])
+app.include_router(graph.router,        prefix="/graph",              tags=["Graph"])
+app.include_router(simulation.router,   prefix="/simulate",           tags=["Simulation"])
+app.include_router(historical.router,   prefix="/simulate/historical",tags=["Historical Scenarios"])
+app.include_router(temporal.router,     prefix="/simulate",           tags=["Temporal Projection"])
+app.include_router(accessibility.router,prefix="/accessibility",      tags=["Accessibility"])
+app.include_router(copilot.router,      prefix="/copilot",            tags=["Copilot"])
+app.include_router(reports.router,      prefix="/reports",            tags=["Reports"])
+app.include_router(bhuvan.router,       prefix="/bhuvan",             tags=["Bhuvan/ISRO"])
+app.include_router(alerts_router.router,prefix="/alerts",             tags=["Weather & Alerts"])
 
 
 @app.get("/health", tags=["Meta"])

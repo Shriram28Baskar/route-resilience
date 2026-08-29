@@ -51,3 +51,6 @@ backend/cache/
 *.json
 scratch.py
 test_request.py
+# Datasets (large, not version-controlled — use DVC or external storage)
+DataSet/
+P2_REPORT.md

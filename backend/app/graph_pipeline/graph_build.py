@@ -22,10 +22,12 @@ AOI_EAST  = float(os.getenv("AOI_EAST",  77.64))
 # ── Graph Store ───────────────────────────────────────────────────────────────
 
 class GraphStore:
-    _raw:             Optional[nx.Graph] = None
-    _healed:          Optional[nx.Graph] = None
-    _osm_fallback:    Optional[nx.Graph] = None
-    _last_simulation: Optional[Dict]     = None
+    _raw:                       Optional[nx.Graph] = None
+    _healed:                    Optional[nx.Graph] = None
+    _osm_fallback:              Optional[nx.Graph] = None
+    _last_simulation:           Optional[Dict]     = None
+    _last_accessibility_impact: Optional[Dict]     = None
+    _last_flood_result:         Optional[Dict]     = None  # FIX H5: flood state for Copilot
 
     @classmethod
     async def initialize(cls):
@@ -63,6 +65,25 @@ class GraphStore:
     @classmethod
     def get_last_simulation(cls) -> Optional[Dict]:
         return cls._last_simulation
+
+    @classmethod
+    def set_last_accessibility_impact(cls, result: Dict):
+        """Store the latest accessibility impact computation for copilot context."""
+        cls._last_accessibility_impact = result
+
+    @classmethod
+    def get_last_accessibility_impact(cls) -> Optional[Dict]:
+        return cls._last_accessibility_impact
+
+    @classmethod
+    def set_last_flood_result(cls, result: Dict):
+        """Store the latest flood simulation result for Copilot context. (Fix H5)"""
+        cls._last_flood_result = result
+
+    @classmethod
+    def get_last_flood_result(cls) -> Optional[Dict]:
+        return cls._last_flood_result
+
 
 
 # ── Skeleton → Graph ──────────────────────────────────────────────────────────

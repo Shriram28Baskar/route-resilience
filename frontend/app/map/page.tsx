@@ -3,8 +3,8 @@
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ShieldAlert, Layers, Hospital, GitBranch, AlertTriangle, Users } from "lucide-react";
-import { getCriticality, getGraphMetrics, getHospitalAccessibility, getEmergencyServices, getEquityAnalysis, getGraphGeoJSON, type CriticalityResponse, type GraphMetrics, type HospitalAccessibility, type EmergencyServicesResponse, type EquityResponse } from "@/lib/api";
+import { ShieldAlert, Layers, Hospital, GitBranch, AlertTriangle, Users, Zap } from "lucide-react";
+import { getCriticality, getGraphMetrics, getHospitalAccessibility, getEmergencyServices, getEquityAnalysis, getGraphGeoJSON, getAccessibilityImpact, type CriticalityResponse, type GraphMetrics, type HospitalAccessibility, type EmergencyServicesResponse, type EquityResponse, type AccessibilityImpactResponse } from "@/lib/api";
 import { centralityColor, resilienceColor } from "@/lib/utils";
 
 // Dynamically import the map to avoid SSR issues with Leaflet
@@ -17,7 +17,11 @@ export default function MapPage() {
   const [emergencyServices, setEmergencyServices] = useState<EmergencyServicesResponse | null>(null);
   const [equity, setEquity] = useState<EquityResponse | null>(null);
   const [graphGeojson, setGraphGeojson] = useState<GeoJSON.FeatureCollection | null>(null);
-  const [activeLayer, setActiveLayer] = useState<"centrality" | "hospitals" | "topology" | "equity" | "emergency">("centrality");
+  const [impactData, setImpactData] = useState<AccessibilityImpactResponse | null>(null);
+  const [impactTopN, setImpactTopN] = useState(3);
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [impactError, setImpactError] = useState<string | null>(null);
+  const [activeLayer, setActiveLayer] = useState<"centrality" | "hospitals" | "topology" | "equity" | "emergency" | "impact">("centrality");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,27 +36,37 @@ export default function MapPage() {
 
   const loadHospitals = async () => {
     if (hospitals) return;
-    setLoading(true);
     try {
       const h = await getHospitalAccessibility();
       if (h) setHospitals(h);
     } catch (e) {
       console.error(e);
-    } finally {
-      setLoading(false);
     }
   };
 
   const loadEmergencyServices = async () => {
     if (emergencyServices) return;
-    setLoading(true);
     try {
       const e = await getEmergencyServices();
       if (e) setEmergencyServices(e);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const runImpactAnalysis = async () => {
+    if (!criticality) return;
+    setImpactLoading(true);
+    setImpactError(null);
+    try {
+      // Use top-N gatekeeper nodes as failure scenario
+      const topNodes = criticality.gatekeepers.slice(0, impactTopN).map(n => n.node_id);
+      const result = await getAccessibilityImpact(topNodes);
+      setImpactData(result);
+    } catch (e: any) {
+      setImpactError(e.message || "Impact analysis failed");
     } finally {
-      setLoading(false);
+      setImpactLoading(false);
     }
   };
 
@@ -102,13 +116,14 @@ export default function MapPage() {
             <MapSkeleton />
           ) : (
             <RoadMap
-            centrality={criticality}
-            hospitals={hospitals}
-            emergencyServices={emergencyServices}
-            equity={equity}
-            activeLayer={activeLayer}
-            graphGeojson={graphGeojson}
-          />
+              centrality={criticality}
+              hospitals={hospitals}
+              emergencyServices={emergencyServices}
+              equity={equity}
+              activeLayer={activeLayer}
+              graphGeojson={graphGeojson}
+              impactData={impactData}
+            />
           )}
         </div>
 
@@ -122,6 +137,20 @@ export default function MapPage() {
           )}
           {activeLayer === "equity" && equity && (
             <EquityLegend equity={equity} />
+          )}
+          {activeLayer === "impact" && (
+            <ImpactPanel
+              criticality={criticality}
+              impactData={impactData}
+              impactTopN={impactTopN}
+              setImpactTopN={setImpactTopN}
+              onRun={runImpactAnalysis}
+              loading={impactLoading}
+              error={impactError}
+            />
+          )}
+          {activeLayer === "emergency" && emergencyServices && (
+            <EmergencyLegend emergencyServices={emergencyServices} />
           )}
           {activeLayer === "topology" && metrics && (
             <TopologyPanel metrics={metrics} />
@@ -260,9 +289,165 @@ function MapSkeleton() {
   );
 }
 
+function ImpactPanel({
+  criticality, impactData, impactTopN, setImpactTopN, onRun, loading, error
+}: {
+  criticality: CriticalityResponse | null;
+  impactData: AccessibilityImpactResponse | null;
+  impactTopN: number;
+  setImpactTopN: (n: number) => void;
+  onRun: () => void;
+  loading: boolean;
+  error: string | null;
+}) {
+  const fmt = (s: number | null | undefined) =>
+    s != null ? `${Math.round(s)}s (${Math.round(s / 60)}m)` : "N/A";
+
+  return (
+    <>
+      <div>
+        <h3 className="font-display font-semibold text-white mb-3 flex items-center gap-1.5">
+          <Zap className="w-3.5 h-3.5 text-[#FF4444]" />
+          Impact Engine
+        </h3>
+        <p className="text-[#6B7280] mb-3 leading-relaxed">
+          Simulate failure of top critical nodes and compute emergency accessibility impact.
+        </p>
+        <label className="block text-[#6B7280] mb-1">Ablate top-N nodes</label>
+        <select
+          value={impactTopN}
+          onChange={e => setImpactTopN(Number(e.target.value))}
+          className="w-full bg-[#0B0F1A] border border-white/10 rounded px-2 py-1.5 text-white text-xs mb-3"
+        >
+          {[1, 3, 5, 10, 25, 50].map(n => (
+            <option key={n} value={n}>Top {n} gatekeeper{n > 1 ? "s" : ""}</option>
+          ))}
+        </select>
+        <button
+          onClick={onRun}
+          disabled={loading || !criticality}
+          className="w-full py-2 rounded-md bg-[#FF4444]/15 border border-[#FF4444]/30 text-[#FF4444] text-xs font-semibold hover:bg-[#FF4444]/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {loading
+            ? <><span className="w-3 h-3 border border-[#FF4444]/50 border-t-[#FF4444] rounded-full animate-spin" />Computing…</>
+            : "Run Impact Analysis"
+          }
+        </button>
+        {error && <p className="text-[#FF4444] mt-2 text-[10px] break-words">{error}</p>}
+      </div>
+
+      {impactData && (
+        <>
+          <div>
+            <div className="text-[#6B7280] uppercase tracking-widest mb-2 font-mono text-[10px]">Hospitals in AOI</div>
+            <div className="font-display text-2xl text-[#00E5B4]">{impactData.hospital_count}</div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-[#6B7280] uppercase tracking-widest mb-2 font-mono text-[10px]">15-min Accessibility</div>
+            <div className="flex justify-between">
+              <span className="text-[#22C55E]">Baseline accessible</span>
+              <span className="font-mono text-white">{impactData.baseline.accessible_node_count.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[#FF4444]">Post-disaster accessible</span>
+              <span className="font-mono text-white">{impactData.post_disaster.accessible_node_count.toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-[#6B7280] uppercase tracking-widest mb-2 font-mono text-[10px]">Impact</div>
+            <div className="flex justify-between">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#FF4444] inline-block" />Lost access</span>
+              <span className="font-mono text-[#FF4444] font-bold">{impactData.impact.nodes_lost_access_count.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#FFB400] inline-block" />Degraded</span>
+              <span className="font-mono text-[#FFB400] font-bold">{impactData.impact.nodes_degraded_count.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Hospitals disconnected</span>
+              <span className="font-mono text-white">{impactData.impact.disconnected_hospital_count}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Avg time increase</span>
+              <span className="font-mono text-white">{fmt(impactData.impact.avg_travel_time_increase_s)}</span>
+            </div>
+          </div>
+
+          {impactData.impact.resilience_index != null && (
+            <div>
+              <div className="text-[#6B7280] uppercase tracking-widest mb-2 font-mono text-[10px]">Resilience Index</div>
+              <div className="font-display text-2xl font-bold" style={{ color: impactData.impact.resilience_index > 0.7 ? "#22C55E" : impactData.impact.resilience_index > 0.4 ? "#FFB400" : "#FF4444" }}>
+                {impactData.impact.resilience_index.toFixed(3)}
+              </div>
+            </div>
+          )}
+
+          {impactData.best_alternative_route?.reachable && (
+            <div>
+              <div className="text-[#6B7280] uppercase tracking-widest mb-2 font-mono text-[10px]">Alternative Route</div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="w-4 h-0.5 bg-[#3B82F6] rounded border-dashed border inline-block" />
+                <span className="text-[#3B82F6] font-semibold">Available (blue dashed)</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Travel time</span>
+                <span className="font-mono text-white">{fmt(impactData.best_alternative_route.travel_time_s)}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5 pt-2 border-t border-white/8">
+            <div className="text-[#6B7280] uppercase tracking-widest mb-1 font-mono text-[10px]">Legend</div>
+            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#FF4444] inline-block" /><span>Lost 15-min hospital access</span></div>
+            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#FFB400] inline-block" /><span>Degraded accessibility (&gt;50% slower)</span></div>
+            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#00E5B4] inline-block" /><span>Hospital / Clinic</span></div>
+            <div className="flex items-center gap-2"><span className="w-4 h-0.5 bg-[#3B82F6] inline-block rounded" /><span>Best alternative route</span></div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 const LAYERS = [
   { id: "centrality", label: "Criticality",  icon: AlertTriangle },
   { id: "hospitals",  label: "Hospitals",    icon: Hospital },
   { id: "emergency",  label: "Fire & Police",icon: ShieldAlert },
+  { id: "impact",     label: "Impact",       icon: Zap },
   { id: "topology",   label: "Topology",     icon: GitBranch },
 ];
+
+function EmergencyLegend({ emergencyServices }: { emergencyServices: EmergencyServicesResponse }) {
+  const fireCount = emergencyServices.facilities.filter(f => f.amenity === "fire_station").length;
+  const policeCount = emergencyServices.facilities.filter(f => f.amenity === "police").length;
+  return (
+    <>
+      <div>
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-[#6B7280] mb-3">
+          Fire & Police Stations
+        </div>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ background: "#FF8C00", boxShadow: "0 0 6px rgba(255,140,0,0.6)" }} />
+            <div>
+              <div className="text-white text-xs font-semibold">Fire Stations</div>
+              <div className="text-[#6B7280] text-[10px]">{fireCount} stations · orange circles</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ background: "#0099FF", boxShadow: "0 0 6px rgba(0,153,255,0.6)" }} />
+            <div>
+              <div className="text-white text-xs font-semibold">Police Stations</div>
+              <div className="text-[#6B7280] text-[10px]">{policeCount} stations · blue circles</div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 pt-3 border-t border-white/8 text-[9px] text-[#6B7280]">
+          Click any circle to see name & type · Source: OpenStreetMap
+        </div>
+      </div>
+    </>
+  );
+}

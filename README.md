@@ -1,257 +1,211 @@
 # Route Resilience
 
-![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg) ![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat&logo=fastapi) ![Next.js](https://img.shields.io/badge/Next.js-black?style=flat&logo=next.js) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker) ![ISRO Hackathon 2026](https://img.shields.io/badge/ISRO_Hackathon-2026-orange.svg)
-
 **Occlusion-Robust Road Extraction & Graph-Theoretic Criticality Analysis for Urban Mobility**
 
-Built for ISRO NNRMS — Problem Statement PS4 | 30-hour hackathon
+Route Resilience is a decision-support backend and dashboard built to analyze urban network vulnerability during extreme weather events. Moving beyond static flood mapping, it applies deterministic topological models to quantify the structural impact of disasters on urban mobility.
 
-> **"When Bengaluru floods—as it did in September 2022—NDRF teams need to know which junction closures isolate the most hospitals within 10 minutes. Our system answers that in 3 seconds."**
-
----
-
-## Table of Contents
-- [Why Route Resilience Matters](#why-route-resilience-matters)
-- [Architecture](#architecture)
-- [Novel Contributions](#novel-contributions)
-- [Dashboard Screenshots](#dashboard-screenshots)
-- [ISRO & NDMA Integration](#isro--ndma-integration)
-- [Benchmarks & Validation](#benchmarks--validation)
-- [Bengaluru AOI Results](#bengaluru-aoi-results)
-- [Feature Coverage](#feature-coverage)
-- [Known Limitations](#known-limitations)
-- [Quick Start](#quick-start)
-- [Tech Stack](#tech-stack)
+Built for ISRO NNRMS — Problem Statement PS4
 
 ---
 
-## Why Route Resilience Matters
+## 1. Project Overview & Motivation
 
-Most road extraction systems stop after mapping roads. Route Resilience answers:
-- Which roads matter most?
-- What happens if they fail?
-- How do failures propagate?
-- Which populations are affected?
-- Which intervention prevents collapse?
+During severe urban flooding, emergency responders often lack real-time topological intelligence. While existing systems identify flooded areas, they fail to answer network-level questions: *If this junction floods, how does the load redistribute? Which hospitals become inaccessible? Where should relief camps be positioned for the surviving population?*
 
-This transforms satellite imagery into actionable disaster-response intelligence.
+Route Resilience combines Computer Vision (for road extraction), Graph Theory (for topological routing and centrality analysis), and Geospatial Data (DEM, WorldPop) into a unified simulation engine to address these critical operational gaps.
 
 ---
 
-## Architecture
+## 2. Architecture & Data Flow
 
-```text
-Satellite Imagery
-       ↓
-Road Extraction Model
-       ↓
-Road Graph Generation
-       ↓
-Critical Junction Detection
-       ↓
-Disaster Simulation Engine
-       ↓
-Evacuation Planner
-       ↓
-AI Copilot + Dashboard
-```
+```mermaid
+flowchart TD
+    subgraph 1. Data Ingestion
+        A[Satellite RGB Tile] --> B(ML Pipeline: U-Net / SegFormer)
+        B --> C{Boolean Road Mask}
+        OSM[OSM Fallback via OSMnx] --> Graph
+    end
 
-### Directory Structure
-```
-route-resilience/
-├── backend/          Python FastAPI — ML inference, graph pipeline, evacuation planner
-├── frontend/         Next.js 14 — interactive dashboard, Leaflet map, Copilot chat
-├── notebooks/        Jupyter — data exploration, model evaluation, validation
-└── docker-compose.yml
-```
+    subgraph 2. Topology Construction
+        C -->|Skeletonization| Graph[NetworkX Graph]
+        DEM[SRTMGL1 DEM] -->|WGS84 Height| Graph
+    end
 
-## Novel Contributions
+    subgraph 3. Simulation Engine
+        Graph --> Ablation[Node Ablation]
+        Graph --> Flood[Static Topography Inundation]
+        Ablation --> Cascade[Cascaded Failure Model]
+    end
 
-1. Occlusion-Robust Road Extraction
-2. Graph-Theoretic Criticality Analysis
-3. Cascading Failure Simulation
-4. Dynamic Flood Impact Modeling
-5. Capacity-Constrained Evacuation Planning
-6. AI Urban Planning Copilot
+    subgraph 4. Analytics & Metrics
+        Cascade --> Metrics[Resilience Index]
+        Flood --> Routing[Dijkstra Alt-Routing]
+        Flood --> Population[15m Buffered WorldPop Intersect]
+        Flood --> Camps[K-Means Relief Camps]
+    end
 
----
-
-## Dashboard Screenshots
-
-*(Note to team: Replace these placeholders with actual image paths before final submission)*
-* `![Critical Junction Analysis](docs/screenshots/critical_junctions.png)`
-* `![Node Ablation & Cascade Failure](docs/screenshots/cascade_failure.png)`
-* `![Flood Simulation & Equity Impact](docs/screenshots/flood_equity.png)`
-* `![Evacuation Planner](docs/screenshots/evacuation_planner.png)`
-
----
-
-## ISRO & NDMA Integration
-
-We explicitly align with ISRO's National Natural Resources Management System (NNRMS) mandate and NDMA disaster response protocols:
-* **ISRO Bhuvan Integration:** Uses Bhuvan WMS/WFS for mapping, rendering ResourceSat-2A LULC layers over the affected AOI.
-* **Satellite-Native:** Pre/Post disaster change detection module designed to take Sentinel-2 or ResourceSat tiles to automatically map flood boundaries.
-* **Sendai Framework Priority 4:** Includes a multi-source evacuation planner calculating capacity-respecting routing from vulnerable zones to safe shelters.
-
-## Benchmarks & Validation
-
-Model Performance on SpaceNet Roads AOI:
-* **IoU:** 0.73 (Target was to beat DeepGlobe 2018 winner at 0.65)
-* **F1-Score:** 0.81
-* **Occlusion Robustness:** +12% IoU retention vs baseline at 40% occlusion
-
-Graph Criticality Validation (Chennai Floods 2015 & Kerala Floods 2018):
-* **Precision@5:** 4/5 (80%) of our top-5 flagged critical nodes matched actual real-world failures/bottlenecks.
-* **Precision@10:** 8/10 (80%)
-
----
-
-## Bengaluru AOI Results
-
-**Road Network:**
-- 13,486 intersections
-- 16,000+ road segments
-
-**Hospitals:**
-- 24 emergency facilities
-
-**Cascade Failure Example:**
-- 44 nodes failed
-- 5 network partitions
-- 44,552 residents impacted
-
-**Flood Simulation:**
-- 312 vulnerable intersections identified
-
-**Evacuation:**
-- Dynamic rerouting under disaster conditions successfully maintained hospital access.
-
-## Quick Start
-
-### 1. Clone & configure
-
-```bash
-git clone https://github.com/your-team/route-resilience.git
-cd route-resilience
-
-cp backend/.env.example backend/.env
-# Edit backend/.env and set GROQ_API_KEY=<your key>
-```
-
-### 2. Backend setup
-
-```bash
-cd backend
-
-# Create virtual environment
-python -m venv .venv && source .venv/bin/activate  # Linux/Mac
-# .venv\Scripts\activate                            # Windows
-
-pip install -r requirements.txt
-
-# Pre-download OSM data and hospital POIs
-python scripts/download_data.py
-
-# Start API server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### 3. Frontend setup
-
-```bash
-cd frontend
-
-npm install
-npm run dev           # http://localhost:3000
-```
-
-### 4. Docker (full stack)
-
-```bash
-# From repo root
-cp backend/.env.example .env
-# Set GROQ_API_KEY in .env
-
-docker-compose up --build
-# Backend → http://localhost:8000
-# Frontend → http://localhost:3000
+    subgraph 5. Decision Support
+        Metrics & Routing & Population & Camps --> Dashboard[Next.js UI]
+        Metrics & Routing & Population & Camps --> Copilot[Grounded AI Copilot]
+    end
 ```
 
 ---
 
-## Feature Coverage
+## 3. Data Integrity & Terminology
 
-| # | Feature | Module |
-|---|---------|--------|
-| 1 | Transformer Road Segmentation | `backend/app/ml/model.py`, `inference.py` |
-| 2 | Occlusion Simulation | `backend/app/ml/augmentations.py` |
-| 3 | Pre/Post Change Detection | `backend/app/ml/change_detection.py` |
-| 4 | Explainability Maps (Grad-CAM) | `backend/app/ml/explain.py` |
-| 5 | Graph Generation & MST Topological Healing | `backend/app/graph_pipeline/graph_build.py` |
-| 6 | Centrality Analysis | `backend/app/graph_pipeline/centrality.py` |
-| 7 | Multi-Source Evacuation | `backend/app/simulation/evacuation.py` |
-| 8 | Cascading Failure Simulation | `backend/app/simulation/cascade.py` |
-| 9 | Resilience Index | `backend/app/simulation/resilience.py` |
-| 10 | Bhuvan Tile Integration | `backend/app/integrations/bhuvan.py`, `RoadMap.tsx` |
-| 11 | Socio-Economic & Financial Loss Modeling | `backend/app/simulation/equity.py` |
-| 12 | AI Urban Planning Copilot | `backend/app/api/copilot.py` + `frontend/app/copilot/` |
+To prevent scientific overreach, this project strictly adheres to the following vocabulary:
+*   **OBSERVED:** Empirical data from external authorities (e.g., IMD 131mm rainfall, OWM current rain rate).
+*   **DERIVED:** Mathematically computed values strictly from observed inputs (e.g., rainfall $\times$ runoff coefficient).
+*   **SIMULATED:** Algorithmic outputs based on topological and geometric models (e.g., static DEM flood extents, node ablation).
+*   **CALIBRATED:** Manual parameter overrides used when standard mathematical models break down under extreme outlier conditions.
+*   **EXTRAPOLATED:** Future projections based on linear persistence of present conditions, explicitly avoiding meteorological forecasting.
 
 ---
 
-## API Reference
+## 4. Scenario Deep Dives
+
+### P1: Historical Disaster Scenario (2022 Bengaluru Flood)
+Models the severe September 5, 2022, flooding in Bengaluru.
+*   **Observed Facts:** 131mm peak 24-hour rainfall (IMD). News archives documented flooding in areas like Koramangala.
+*   **Rainfall-Derived Output:** Standard uniform-runoff models fail for extreme localized urban events. The formula derives a water level of 877.09m, which predicts only **5** flooded nodes on the 13,000+ node graph.
+*   **Calibrated Scenario Input:** To match historical reality, the scenario water level is explicitly **calibrated** to 905m ASL to geographically encompass the documented flood extent. It is *not* a predictive meteorological output from the 131mm rainfall.
+*   **Simulated Impacts:** The calibrated 905m flood extent triggers the network simulation, revealing isolated hospitals and disconnected communities.
+
+### P2: Temporal Scenario Projection
+Projects flood risk across time horizons (NOW, +30min, +60min, +90min).
+*   **NOW State (Observed):** Current 1-hour rainfall accumulation (mm) fetched via OpenWeatherMap.
+*   **+30/+60/+90 (Extrapolated):** Computed by assuming the current rainfall rate persists linearly. **This is a linear persistence assumption, not a meteorological forecast.**
+*   **Network Consequences (Simulated):** Water levels at each extrapolated horizon are mapped against the static DEM bathtub model to simulate progressive topological collapse.
+
+---
+
+## 5. Algorithms & Methodology
+
+### Graph Construction & Routing
+*   **Edge Weights (`time_s`):** Shortest-path routing operates on travel time. For ML-extracted road masks, skeletonized edges default to a static `30 km/h` speed since semantic models cannot determine road hierarchy. Conversely, the **OSM fallback graph** utilizes explicit road-class speed limits (e.g., `motorway` = 80km/h).
+*   **Routing Penalties:** Alternative routes are discovered via Dijkstra's algorithm, explicitly penalizing edges on the primary path with a `4.0x` multiplier to enforce topologically distinct alternatives.
+
+### Topography (DEM)
+*   **Static Inundation:** Flood extent is determined via a static height-threshold (bathtub model) using 30m SRTMGL1 data. This is a purely geometric approximation and is **never** characterized as a hydrodynamic or fluid simulation.
+
+### Population (WorldPop)
+*   **Spatial Intersection:** WorldPop 2020 (100m gridded estimates) is queried via spatial raster intersection. Flooded edge `LineStrings` are unioned and buffered by **15m**. `rasterio.mask` intersects the 100m raster pixels overlapping this road-corridor boundary. 
+*   **Integrity Constraint:** Assigning broad raster population data to 1D graph nodes mathematically is explicitly avoided. Consequently, population impacts are calculated purely for spatial flood extents, *not* for abstract node-ablation scenarios. WorldPop is an order-of-magnitude estimate, never treated as census ground truth.
+
+### Cascading Failure & Resilience
+*   **Cascading Failure:** Models secondary chokepoint collapse. After initial node ablation, Betweenness Centrality is recomputed. Nodes exceeding a dynamically increasing stress threshold (`dampening factor = 0.15` per iteration) fail in successive waves, ensuring mathematical decay.
+*   **Resilience Index (RI):** $RI = \frac{\text{Baseline Avg Travel Time}}{\text{Perturbed Avg Travel Time}}$. Disconnected paths are severely penalized with an assumed 3600-second (1 hour) delay.
+
+### Decision Support
+*   **Relief Camp Optimization:** Uses deterministic K-Means clustering (`random_state=42`) on the spatial coordinates of the surviving graph's Largest Connected Component (LCC) to select $k$ optimal safe-zone locations.
+*   **AI Copilot (`qwen/qwen3.6-27b`):** Grounded via a deterministic JSON snapshot of the active `GraphStore` (flood levels, resilience metrics). Incorporates a strict HTTP 429 rate-limit fallback to ensure the primary dashboard never crashes during LLM outages.
+
+---
+
+## 6. Data Sources
+
+| Domain | Source | Resolution / Notes |
+|---|---|---|
+| **Topography** | SRTMGL1 (`.hgt`) | 1-arcsecond (~30m) WGS84 |
+| **Population** | WorldPop 2020 UN-adj (`.tif`) | ~100m gridded estimates |
+| **Meteorology** | OpenWeatherMap / IMD (2023) | API / Gridded historical records |
+| **Infrastructure** | Sentinel-2 / OSM Overpass | RGB Tiles / Point-of-Interest coordinates |
+
+---
+
+## 7. API Reference
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/segment/` | POST | Segment uploaded tile → mask + confidence |
-| `/graph/build` | POST | Skeletonize mask → NetworkX graph |
-| `/simulate/ablate` | POST | Node ablation + Resilience Index |
-| `/simulate/cascade` | POST | Cascading failure simulation |
-| `/simulate/evacuate` | POST | Capacity-constrained evacuation routing |
-| `/bhuvan/roads` | GET | Proxy to Bhuvan REST API for road data |
-| `/reports/generate` | POST | One-click PDF situation report export |
+| `/segment/` | POST | Segments an RGB tile into a road mask. |
+| `/graph/build` | POST | Converts skeletonized masks into a NetworkX graph. |
+| `/simulate/ablate` | POST | Ablates specific nodes; returns the Resilience Index. |
+| `/simulate/cascade` | POST | Executes the dampened iterative cascading failure model. |
+| `/simulate/flood` | POST | Simulates inundation via static DEM elevation thresholds. |
+| `/simulate/route` | POST | Dijkstra shortest path with penalized alternative routing. |
+| `/simulate/relief-camps` | POST | Finds optimal safe-zone coordinates using K-Means clustering. |
+| `/simulate/rainfall-backtest`| POST| Evaluates historical 2023 IMD events for directional validation. |
+| `/copilot/chat` | POST | Queries the context-grounded `qwen3.6-27b` Copilot. |
 
-Interactive docs: **http://localhost:8000/docs**
-
----
-
-## Demo Scenario (Bengaluru AOI)
-
-1. **Open http://localhost:3000** → dashboard showing live graph metrics
-2. **Toggle ISRO Layer** → Show Bhuvan ResourceSat-2A overlay
-3. **Map → Criticality layer** → see gatekeeper intersections in red
-4. **Simulate → Cascade** → Watch animated second-order stressed nodes propagate dynamically
-5. **Simulate → Evacuation** → Map optimal shelter assignments for isolated vulnerable zones
-6. **Reports** → Export actionable NDMA-compliant PDF brief
-7. **Copilot** → Query the Urban Planning AI to recommend a structural intervention (e.g., pre-building a bridge) to resolve the simulated network partition.
+*(Swagger UI is available at `http://localhost:8000/docs`)*
 
 ---
 
-## Known Limitations
+## 8. Project Structure
 
-- Current flood model uses elevation thresholds.
-- Cascade model uses load-redistribution assumptions.
-- Road extraction accuracy decreases under extreme occlusion.
-- Results should be treated as decision-support, not operational directives.
+```text
+route-resilience/
+├── backend/
+│   ├── app/
+│   │   ├── api/          # FastAPI routers
+│   │   ├── ml/           # U-Net/SegFormer models & PyTorch inference
+│   │   ├── graph_pipeline/# Skeletonization & centrality metrics
+│   │   ├── simulation/   # Disaster physics, routing, camps, resilience
+│   │   └── data/         # WorldPop raster handling & IMD parsers
+│   ├── tests/            # Pytest automated suite
+│   └── requirements.txt
+├── frontend/             # Next.js 14 / Tailwind / Leaflet UI
+├── DataSet/              # Required local datasets (.hgt, .tif, .csv)
+└── docker-compose.yml
+```
 
 ---
 
-## Tech Stack
+## 9. Setup, Run & Test
 
-| Layer | Stack |
-|-------|-------|
-| Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS, Leaflet |
-| Backend | FastAPI, Python 3.11 |
-| AI/ML | PyTorch, segmentation-models-pytorch, OpenCV |
-| Geospatial | OSMnx, NetworkX, GeoPandas, Rasterio, Shapely |
-| APIs | Bhuvan WMS, Groq API (LLaMA-3) |
+1. **Clone & Environment:**
+   ```bash
+   git clone https://github.com/your-team/route-resilience.git
+   cd route-resilience
+   cp backend/.env.example backend/.env
+   # Edit backend/.env and set GROQ_API_KEY
+   ```
+
+2. **Backend Setup:**
+   ```bash
+   cd backend
+   python -m venv .venv
+   source .venv/bin/activate  # Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   ```
+
+3. **Frontend Setup:**
+   ```bash
+   cd ../frontend
+   npm install
+   npm run dev
+   ```
+   *(Access dashboard at `http://localhost:3000`)*
+
+4. **Testing:**
+   ```bash
+   cd backend
+   .venv\Scripts\python -m pytest tests/
+   ```
+
+> [!WARNING]  
+> **Known Test Failure:** The current `pytest` suite (`tests/test_analytics.py`) is failing (`TypeError`, `KeyError`). It calls a deprecated `total_population` arithmetic function that was purged from the main application to maintain scientific integrity. The tests await a rewrite to accommodate the new Shapely/Rasterio spatial-clipping methodology.
 
 ---
 
-## Team Execution Plan
+## 10. Validation, Performance & Limitations
 
-See `PRD.md` for the full 30-hour two-team execution timeline.
+### Validation / Integrity
+*   **Directional Validation:** The `/simulate/rainfall-backtest` endpoint computes static DEM flood extents for empirical 2023 IMD daily records and aligns them against documented BBMP flood reports for *directional validation*. It strictly avoids claiming ground-truth hydrodynamic accuracy.
+*   **Determinism:** Given the same `.hgt` topography, `.tif` population data, and OSM graph, all routing, clipping, and cascading algorithms are mathematically deterministic.
 
-**Sub-Team A** (ML): `backend/app/ml/`, `notebooks/`
-**Sub-Team B** (Graph/Frontend): `backend/app/graph_pipeline/`, `backend/app/simulation/`, `frontend/`
+### Performance
+*   **Pre-computation:** To maintain low latency, initial topological metrics (Betweenness Centrality for $k=50$, Articulation Points) are computed on background threads during startup, ensuring base endpoints respond in `< 3.0 seconds`.
+*   **Cascading Scale:** Complex iterative cascading simulations scale linearly in computation time based on the number of iterations and the $k$ sample size of the centrality recomputations.
 
-**Critical fallback:** OSM graph pre-downloaded via `scripts/download_data.py` means Sub-Team B can build and demo the entire dashboard independently of model training progress.
+### Limitations
+1.  **Static Bathtub Flooding:** Relies strictly on geometric elevation thresholds. It does not account for hydrodynamic flow, water velocity, or drainage infrastructure.
+2.  **Centrality-based Cascades:** Redistributes load based purely on betweenness centrality logic, not microscopic vehicle traffic or localized congestion limits.
+3.  **ML Speed Assumptions:** ML-extracted roads assume a flat 30km/h speed limit due to the inability to semantically classify road hierarchies from binary masks.
+
+### Future Work
+*   Integrate full 1D/2D hydrodynamic routing (e.g., EPA SWMM) to replace the static DEM approximation.
+*   Leverage premium sub-hourly weather APIs (e.g., OWM OneCall 3.0) for genuine meteorological nowcasting.
+*   Train semantic segmentation models to extract distinct road classes, allowing for variable speed modeling on ML-derived graphs.

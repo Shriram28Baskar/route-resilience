@@ -241,6 +241,11 @@ def compute_relief_camps(G: nx.Graph, k: int = 3) -> dict:
 
     for i, camp in enumerate(results):
         camp["node_count"] = camp_counts.get(i, 0)
-        camp["population_estimate"] = camp_counts.get(i, 0) * 1008
+        # NOTE: population_estimate deliberately NOT computed here.
+        # The 'node_count' field counts road graph nodes in this camp's catchment zone —
+        # NOT people. Population requires WorldPop raster intersection, which is done
+        # in the accessibility impact endpoint. A node_count * arbitrary_constant
+        # fabrication is explicitly excluded per project data integrity rules.
 
     return {"camps": results, "catchment_mapping": catchment_mapping}
+

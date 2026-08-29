@@ -27,13 +27,39 @@ STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 @lru_cache(maxsize=1)
 def _get_model():
-    """Load and cache the inference model (singleton)."""
-    model = build_model(
-        variant=os.getenv("MODEL_VARIANT", "unet"),
-        encoder=os.getenv("MODEL_ENCODER", "resnet50"),
-        weights=None,  # will be loaded from checkpoint
-    )
-    model = load_checkpoint(model, CHECKPOINT, device=DEVICE)
+    """Load and cache the inference model (singleton).
+
+    Weight priority:
+    1. Fine-tuned checkpoint at CHECKPOINT path (best accuracy, road-specific).
+    2. ImageNet pretrained encoder weights (meaningful feature extraction,
+       road-texture aware even without road-specific fine-tuning).
+    3. Random weights (worst case — should never reach this).
+    """
+    checkpoint_exists = os.path.exists(CHECKPOINT)
+
+    if checkpoint_exists:
+        # Load architecture with random weights, then overwrite with checkpoint
+        model = build_model(
+            variant=os.getenv("MODEL_VARIANT", "unet"),
+            encoder=os.getenv("MODEL_ENCODER", "resnet50"),
+            weights=None,
+        )
+        model = load_checkpoint(model, CHECKPOINT, device=DEVICE)
+        logger.info(f"Model loaded from checkpoint: {CHECKPOINT}")
+    else:
+        # Fall back to ImageNet pretrained encoder — far better than random weights
+        logger.warning(
+            f"Checkpoint not found at {CHECKPOINT}. "
+            "Using ImageNet pretrained encoder (resnet50). "
+            "Grad-CAM will highlight road-texture features. "
+            "For full accuracy, train on SpaceNet and save checkpoint."
+        )
+        model = build_model(
+            variant=os.getenv("MODEL_VARIANT", "unet"),
+            encoder=os.getenv("MODEL_ENCODER", "resnet50"),
+            weights="imagenet",  # pretrained on 1.2M ImageNet images
+        )
+
     model.to(DEVICE).eval()
     return model
 

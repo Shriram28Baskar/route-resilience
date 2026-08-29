@@ -72,49 +72,92 @@ class ReliefCampRequest(BaseModel):
     ablated_node_ids: List[str] = []
     num_camps: int = 3
 
+from app.integrations.overpass import fetch_facilities
+from app.api.accessibility import _snap_to_graph, _get_affected_wards
+from app.data.population import query_population_nodes
+from app.data.rainfall import load_bengaluru_urban_rainfall, get_heavy_events, load_annual_normal_rainfall
+from app.data.backtest import rainfall_to_water_level, backtest_event, compute_validation_summary
+
+
+class BacktestRequest(BaseModel):
+    min_rainfall_mm: float = 0.0   # filter: only backtest events with >= this rainfall
+    max_events: int = 50           # cap to avoid very slow runs
+
 @router.post("/flood")
-def simulate_flood(req: FloodRequest):
+async def simulate_flood(req: FloodRequest):
     """
-    Simulates a flood at the given water level (in meters).
-    Returns the ablated nodes and the elevation bounds.
+    Simulates a flood at the given water level (in meters ASL).
+    Node inundation is determined by real SRTM terrain elevation (30m resolution).
+    Approximation: static water pooling model (not dynamic flow).
     """
     G = GraphStore.get_healed() or GraphStore.get_osm_fallback()
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
     
-    bounds = get_elevation_bounds(G)
+    bounds = get_elevation_bounds(G)   # now returns dict
     flooded = flood_ablate(G, req.water_level)
-    
-    elevation_unknown_count = sum(1 for _, data in G.nodes(data=True) if data.get('elevation_unknown', False))
+    flooded_set = set(flooded)
 
-    impacted_areas = set()
-    for n in flooded:
-        data = G.nodes[n]
-        lat = data.get('y')
-        lon = data.get('x')
-        if lat and lon:
-            if 12.92 <= lat <= 12.94 and 77.61 <= lon <= 77.63:
-                impacted_areas.add("Koramangala")
-            if 12.91 <= lat <= 12.93 and 77.65 <= lon <= 77.68:
-                impacted_areas.add("Bellandur")
-            if 12.91 <= lat <= 12.92 and 77.63 <= lon <= 77.66:
-                impacted_areas.add("Sarjapur Rd")
+    elevation_unknown_count = bounds.get("unknown_count", 0)
+
+    # NOTE: Named area identification is handled by the BBMP ward system via /accessibility/ward-report.
+    # The hardcoded bbox labels (Koramangala/Bellandur/Sarjapur Rd) have been removed —
+    # they were spatially inconsistent with the ward boundary system.
+
+    road_length_m = 0
+    for u, v, data in G.edges(data=True):
+        if u in flooded_set or v in flooded_set:
+            road_length_m += data.get('length', 0)
     
+    # Real data: fetch facilities and check intersection
+    s, w, n, e = 12.92, 77.57, 12.99, 77.64
+    hospitals_raw = await fetch_facilities(s, w, n, e, amenities=["hospital", "clinic", "health_post"])
+    emergency_raw = await fetch_facilities(s, w, n, e, amenities=["fire_station", "police", "ambulance_station"])
+    
+    hosp_nodes = _snap_to_graph(G, hospitals_raw)
+    emerg_nodes = _snap_to_graph(G, emergency_raw)
+    
+    hospitals_flooded = sum(1 for node in hosp_nodes if node in flooded_set)
+    emergency_flooded = sum(1 for node in emerg_nodes if node in flooded_set)
+    
+    # Real population data: query WorldPop raster for flooded area
+    pop_result = query_population_nodes(G, flooded)
+    population_affected = pop_result.get("population") or 0
+
     impact_metrics = {
-        "population_affected": len(flooded) * 1008,
-        "cost_estimate_usd": len(flooded) * 15000,
-        "hospitals_affected": max(0, int(len(flooded) * 0.005)),
-        "emergency_stations_affected": max(0, int(len(flooded) * 0.002)),
+        "population_affected": population_affected,
+        "population_source": pop_result.get("source", "unknown"),
+        "population_methodology": "WorldPop_2020_100m_gridded_estimate_bbox_aggregation",
+        "hospitals_affected": hospitals_flooded,
+        "emergency_stations_affected": emergency_flooded,
+        "repair_cost_note": (
+            "Not estimated — requires road-type-weighted unit cost data (e.g., PWD/BBMP "
+            "schedule of rates), which is not available in the current dataset."
+        ),
     }
 
-    return JSONResponse({
+
+    flood_result = {
         "ablated_nodes": [str(n) for n in flooded],
-        "elevation_bounds": {"min": bounds[0], "max": bounds[1]},
+        "elevation_bounds": {
+            "min": bounds["min"],
+            "max": bounds["max"],
+            "mean": bounds["mean"],
+        },
         "water_level": req.water_level,
         "elevation_unknown_count": elevation_unknown_count,
-        "impacted_areas": list(impacted_areas),
-        "impact_metrics": impact_metrics
-    })
+        "elevation_model": "SRTMGL1_30m_static_DEM_inundation_approximation",
+        "impact_metrics": impact_metrics,
+        "road_length_flooded_km": round(road_length_m / 1000, 2),
+        "total_nodes": G.number_of_nodes(),
+        "flooded_nodes_count": len(flooded),
+    }
+
+    # Store in GraphStore so Copilot can answer flood questions (Fix H5)
+    GraphStore.set_last_flood_result(flood_result)
+
+    return JSONResponse(flood_result)
+
 
 @router.get("/flood/curve")
 def get_flood_curve():
@@ -125,11 +168,11 @@ def get_flood_curve():
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
         
-    bounds = get_elevation_bounds(G)
+    bounds = get_elevation_bounds(G)   # dict
     curve = []
     
-    min_elev = int(bounds[0])
-    max_elev = int(bounds[1])
+    min_elev = int(bounds["min"])
+    max_elev = int(bounds["max"])
     
     total_nodes = G.number_of_nodes()
     if total_nodes == 0:
@@ -148,6 +191,82 @@ def get_flood_curve():
         })
         
     return JSONResponse(curve)
+
+
+@router.post("/rainfall-backtest")
+def simulate_rainfall_backtest(req: BacktestRequest):
+    """
+    Step 7: Historical rainfall backtesting + validation metrics.
+
+    Loads real IMD daily rainfall records for Bengaluru Urban district,
+    converts each event to an estimated flood water level (via DEM + runoff model),
+    runs the flood simulation, and validates the predicted flood extent against
+    known flood-prone BBMP wards (Sep-Nov 2023 Bengaluru flood events).
+
+    Methodology is static DEM pooling with urban runoff coefficient 0.70.
+    All limitations are explicitly reported. No numbers are fabricated.
+
+    Data sources:
+      - Rainfall: IMD GRID MODEL daily CSV files (2023)
+      - Terrain: SRTMGL1 30m DEM (Step 1 verified)
+      - Graph: OpenStreetMap via OSMnx
+      - Ward boundaries: BBMP GeoJSON
+      - Validation reference: BBMP flood reports / news archives Sep-Nov 2023
+    """
+    G = GraphStore.get_healed() or GraphStore.get_osm_fallback()
+    if G is None:
+        raise HTTPException(status_code=404, detail="No graph available.")
+
+    # Load all IMD records
+    all_events = load_bengaluru_urban_rainfall()
+    if not all_events:
+        raise HTTPException(
+            status_code=503,
+            detail="IMD rainfall CSV files not found. Check DataSet/response_*.csv"
+        )
+
+    # Filter by min_rainfall_mm and cap
+    events = [e for e in all_events if e["avg_rainfall_mm"] >= req.min_rainfall_mm]
+    events = events[:req.max_events]
+
+    if not events:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No rainfall events found with >= {req.min_rainfall_mm}mm"
+        )
+
+    logger.info(f"Backtesting {len(events)} rainfall events (min={req.min_rainfall_mm}mm)...")
+
+    # Run backtest for each event
+    results = []
+    for event in events:
+        result = backtest_event(
+            G=G,
+            event=event,
+            flood_ablate_fn=flood_ablate,
+            get_affected_wards_fn=_get_affected_wards,
+        )
+        results.append(result)
+
+    # Aggregate validation summary
+    validation_summary = compute_validation_summary(results)
+
+    # Annual normal rainfall reference
+    annual_normal = load_annual_normal_rainfall()
+
+    return JSONResponse({
+        "backtest_config": {
+            "min_rainfall_mm": req.min_rainfall_mm,
+            "events_backtested": len(results),
+            "total_records_available": len(all_events),
+            "district": "Bengaluru Urban",
+            "data_year": 2023,
+        },
+        "annual_reference": annual_normal,
+        "validation_summary": validation_summary,
+        "events": results,
+    })
+
 
 @router.post("/relief-camps")
 def simulate_relief_camps(req: ReliefCampRequest):
@@ -275,11 +394,8 @@ def ablate_compare(req: CompareRequest):
     rand_targets = _random.sample(all_nodes, n)
     G_rand = ablate_nodes(G, rand_targets)
     ri_rand = compute_resilience_index(G, G_rand)
-    
-    # Enforce realistic scaling: Random failure should cause less damage than targeted betweenness attacks
-    if ri_bc["resilience_index"] is not None and ri_rand["resilience_index"] is not None:
-        if ri_rand["resilience_index"] <= ri_bc["resilience_index"]:
-            ri_rand["resilience_index"] = min(0.98, ri_bc["resilience_index"] + 0.05)
+    # NOTE: Random failure result is the actual computed value. No adjustment applied.
+    # In small-n scenarios, random failure can occasionally equal or exceed targeted attacks — this is correct behaviour.
             
     results.append({
         "strategy": "Random Failure",

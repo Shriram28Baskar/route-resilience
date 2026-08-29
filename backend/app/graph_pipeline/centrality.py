@@ -145,7 +145,11 @@ def compute_closeness(G: nx.Graph, k: Optional[int] = 50) -> Dict[int, float]:
             centrality = nx.closeness_centrality(lcc, distance="weight")
         else:
             import random
-            sample_nodes = random.sample(list(lcc.nodes()), min(k or 50, n))
+            # Use deterministic seed to ensure reproducibility across calls
+            _rng = random.Random(42)
+            sorted_nodes = sorted(list(lcc.nodes()))
+            sample_nodes = _rng.sample(sorted_nodes, min(k or 50, n))
+
             dist_sums = {node: 0.0 for node in lcc.nodes()}
             reachable_counts = {node: 0 for node in lcc.nodes()}
             

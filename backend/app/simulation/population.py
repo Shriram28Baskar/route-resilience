@@ -1,7 +1,34 @@
 """
-Population Impact Analysis.
-Estimates the number of people isolated by a disaster by mapping
-population data to road network nodes and computing accessibility.
+Population impact for ablation (node-removal) scenarios.
+
+IMPORTANT METHODOLOGICAL NOTE
+------------------------------
+Estimating population impact from node ablation requires spatially assigning
+population to road nodes — e.g., by computing Voronoi regions around nodes
+and summing WorldPop raster population within each region.
+
+This spatial join is NOT implemented in the current system.
+
+The previous version of this module divided 13.6M people evenly across all
+road nodes (pop_per_node = total_population / node_count). This assumption
+is methodologically unsound — road nodes are not evenly distributed by
+population, and mixing industrial, residential, and highway nodes equally
+produces meaningless numbers.
+
+That fake calculation has been removed (audit fix C3, 2026-08-28).
+
+For flood scenarios, population IS correctly estimated via WorldPop raster
+bbox query in backend/app/data/population.py — use that instead.
+
+What this module now returns
+-----------------------------
+A structured data-gap response that:
+- Reports the number of network nodes removed/isolated (which IS real and computed)
+- Clearly states that population estimation is not available for this scenario type
+- Directs users to the flood impact endpoint (/accessibility/flood-impact) for
+  population figures backed by WorldPop spatial raster data
+
+This is a deliberate choice to report less rather than fabricate.
 """
 import logging
 from typing import Dict, Any
@@ -10,74 +37,60 @@ import networkx as nx
 
 logger = logging.getLogger(__name__)
 
-# Base population of Bengaluru (approx)
-TOTAL_POPULATION = 13_600_000 
 
 def estimate_population_impact(
     baseline_G: nx.Graph,
     perturbed_G: nx.Graph,
-    total_population: int = TOTAL_POPULATION
 ) -> Dict[str, Any]:
     """
-    Estimates the number of people affected/isolated by a disaster.
-    
-    This uses a simplified heuristic: population is distributed 
-    proportionally to nodes in the largest connected component (LCC).
-    When nodes are ablated or disconnected from the LCC, the corresponding
-    population is considered 'isolated'.
-    
-    Args:
-        baseline_G: The original, healthy graph.
-        perturbed_G: The graph after disaster node ablation.
-        total_population: Estimated total population for the AOI.
-        
+    Report network isolation metrics from node ablation.
+
+    DOES NOT estimate population — spatial population assignment
+    to road nodes is not implemented. See module docstring.
+
     Returns:
-        Dict with keys:
-        - total_affected (int): Population on nodes directly ablated or disconnected.
-        - isolated_count (int): Number of nodes isolated.
-        - percent_affected (float): Percentage of total population affected.
+        Dict with:
+        - isolated_nodes (int): nodes removed from LCC by ablation
+        - lcc_fraction_retained (float): fraction of LCC retained post-ablation
+        - population_note (str): explicit data-gap explanation
     """
     if baseline_G.number_of_nodes() == 0:
         return {
-            "total_affected": 0,
-            "isolated_count": 0,
-            "percent_affected": 0.0
+            "isolated_nodes": 0,
+            "lcc_fraction_retained": 1.0,
+            "population_note": "Graph is empty.",
         }
 
-    # Identify LCC in baseline
+    # Baseline LCC
     if nx.is_connected(baseline_G):
-        baseline_lcc_nodes = set(baseline_G.nodes())
+        baseline_lcc = set(baseline_G.nodes())
     else:
-        baseline_lcc_nodes = max(nx.connected_components(baseline_G), key=len)
+        baseline_lcc = set(max(nx.connected_components(baseline_G), key=len))
 
-    baseline_lcc_size = len(baseline_lcc_nodes)
-    if baseline_lcc_size == 0:
-        baseline_lcc_size = 1 # Avoid div by zero
-
-    # Distribute population evenly across LCC nodes
-    # (In a real system, we would map census/WorldPop rasters to nodes)
-    pop_per_node = total_population / baseline_lcc_size
-
-    # Identify LCC in perturbed graph
-    if nx.is_connected(perturbed_G):
-        perturbed_lcc_nodes = set(perturbed_G.nodes())
-    elif perturbed_G.number_of_nodes() > 0:
-        perturbed_lcc_nodes = max(nx.connected_components(perturbed_G), key=len)
+    # Perturbed LCC
+    if perturbed_G.number_of_nodes() == 0:
+        perturbed_lcc = set()
+    elif nx.is_connected(perturbed_G):
+        perturbed_lcc = set(perturbed_G.nodes())
     else:
-        perturbed_lcc_nodes = set()
+        perturbed_lcc = set(max(nx.connected_components(perturbed_G), key=len))
 
-    # Isolated nodes are those that were in the baseline LCC but are no longer
-    # in the perturbed LCC (either because they were ablated or disconnected).
-    isolated_nodes = set(baseline_lcc_nodes) - set(perturbed_lcc_nodes)
-    isolated_count = len(isolated_nodes)
-    
-    total_affected = int(isolated_count * pop_per_node)
-    percent_affected = round((total_affected / total_population) * 100, 2)
-    
-    logger.info(f"Population impact: {isolated_count} isolated nodes, {total_affected} people ({percent_affected}%)")
+    isolated_nodes = len(baseline_lcc - perturbed_lcc)
+    lcc_fraction = len(perturbed_lcc) / len(baseline_lcc) if baseline_lcc else 1.0
+
+    logger.info(
+        f"Ablation network impact: {isolated_nodes} nodes isolated from LCC. "
+        f"LCC retained: {lcc_fraction:.2%}. Population not estimated."
+    )
 
     return {
-        "total_affected": total_affected,
-        "isolated_count": isolated_count,
-        "percent_affected": percent_affected
+        "isolated_nodes": isolated_nodes,
+        "lcc_fraction_retained": round(lcc_fraction, 4),
+        "population_note": (
+            "Population impact not estimated for node-ablation scenarios. "
+            "Spatially assigning WorldPop raster population to individual road nodes "
+            "requires Voronoi region computation, which is not implemented. "
+            "For population figures, use /accessibility/flood-impact with a "
+            "flood-scenario node list — that endpoint uses actual WorldPop spatial data."
+        ),
     }

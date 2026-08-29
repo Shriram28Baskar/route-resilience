@@ -6,14 +6,27 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Map a centrality score [0, 1] to a hex color on a green → yellow → red scale.
+ * Map a centrality score [0, 1] to a hex color.
+ * Low  → emerald (#10B981)
+ * Mid  → amber   (#F59E0B)
+ * High → rose    (#E11D48)
  */
 export function centralityColor(score: number): string {
-  // Low centrality → green, medium → yellow, high → red
-  const r = Math.round(score * 255 + (1 - score) * 34);
-  const g = Math.round((1 - score) * 197 + score * 68);
-  const b = 34;
-  return `rgb(${r},${g},${b})`;
+  if (score < 0.5) {
+    // emerald → amber
+    const t = score / 0.5;
+    const r = Math.round(16  + t * (245 - 16));
+    const g = Math.round(185 + t * (158 - 185));
+    const b = Math.round(129 + t * (11  - 129));
+    return `rgb(${r},${g},${b})`;
+  } else {
+    // amber → rose
+    const t = (score - 0.5) / 0.5;
+    const r = Math.round(245 + t * (225 - 245));
+    const g = Math.round(158 + t * (29  - 158));
+    const b = Math.round(11  + t * (72  - 11));
+    return `rgb(${r},${g},${b})`;
+  }
 }
 
 /**
