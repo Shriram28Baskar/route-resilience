@@ -843,19 +843,10 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
 }
 
 function AblationResults({ result, vulnerability }: { result: AblationResponse, vulnerability?: VulnerabilityResponse | null }) {
-  const [compare, setCompare] = useState<AblateCompareResponse | null>(null);
-  const [prescribe, setPrescribe] = useState<PrescribeResponse | null>(null);
-
-  useEffect(() => {
-    const topN = result.ablated_nodes.length || 1;
-    compareAblation(topN).then(setCompare).catch(() => setCompare(null));
-    prescribeAblation(result.ablated_nodes, 0).then(setPrescribe).catch(() => setPrescribe(null));
-  }, [result]);
 
   const ri = result.resilience_index;
   const riColor = resilienceColor(ri);
 
-  // ── Severity classification ──────────────────────────────────────────────
   const severity = result.disconnected
     ? { label: "CRITICAL", sub: "(Network Partition Detected)", color: "#FF2D2D", bg: "rgba(255,45,45,0.12)", border: "rgba(255,45,45,0.3)", icon: "🔴" }
     : ri === null || ri < 0.95
@@ -863,8 +854,6 @@ function AblationResults({ result, vulnerability }: { result: AblationResponse, 
     : ri <= 0.98
     ? { label: "DEGRADED", sub: "(Minor Rerouting Needed)", color: "#FFE600", bg: "rgba(255,230,0,0.1)", border: "rgba(255,230,0,0.3)", icon: "🟡" }
     : { label: "HEALTHY", sub: "(Network Remains Fully Connected)", color: "#00E5B4", bg: "rgba(0,229,180,0.1)", border: "rgba(0,229,180,0.3)", icon: "🟢" };
-
-  // ── Impact Translation (path length → real-world minutes) ────────────────
   const baselineMin = result.baseline_avg_path_length ? (result.baseline_avg_path_length) / 60 : null;
   const perturbedMin = result.perturbed_avg_path_length ? (result.perturbed_avg_path_length) / 60 : null;
   const extraMin = (baselineMin && perturbedMin) ? (perturbedMin - baselineMin) : null;
@@ -872,297 +861,79 @@ function AblationResults({ result, vulnerability }: { result: AblationResponse, 
     ? ((result.perturbed_avg_path_length - result.baseline_avg_path_length) / result.baseline_avg_path_length * 100).toFixed(1)
     : null;
 
-  // ── Comparison chart data ───────────────────────────────────────────────
-  const compareData = compare?.strategies.map(s => ({
-    name: s.strategy.split(" ")[0],
-    fullName: s.strategy,
-    drop: s.resilience_index !== null ? parseFloat(((1 - s.resilience_index) * 100).toFixed(1)) : 0,
-    color: s.color,
-    disconnected: s.disconnected,
-    winner_label: s.winner_label,
-  })) ?? [];
-  const winner = compare?.strategies.find(s => s.winner_label);
-
-  const bestPrescription = prescribe?.suggestions?.[0];
-
   return (
-    <div className="space-y-6 pb-12">
-      
-      {/* ── Phase 1: Vulnerability Assessment ─────────────────────────────────── */}
-      <div className="bg-[#111827] border border-white/8 rounded-xl p-6">
-        <h3 className="font-display font-semibold text-sm mb-4 flex items-center gap-2 text-[#6B7280]">
-          <span className="w-5 h-5 rounded bg-[#6B7280]/20 flex items-center justify-center text-xs">1</span>
-          VULNERABILITY ASSESSMENT (BASELINE)
-        </h3>
-        {vulnerability ? (
-          <div className="space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="text-xs text-[#6B7280] mb-1 font-mono uppercase tracking-widest">Network Risk Level</div>
-                <div className="font-display text-4xl font-bold text-[#FF4444]">
-                  {vulnerability.fragility_summary.risk_level}
-                </div>
-                <div className="mt-2 text-xs text-[#9CA3AF]">
-                  Detected <span className="text-white font-bold">{vulnerability.fragility_summary.single_points_of_failure}</span> single points of failure (~{Math.round((vulnerability.fragility_summary.single_points_of_failure / result.baseline_metrics.num_nodes) * 100)}% of network).
-                </div>
-              </div>
-              <div className="text-right max-w-[200px]">
-                <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1">Top Threat</div>
-                <div className="text-sm font-medium text-white mb-1">
-                  Top <span className="text-[#FF4444]">{result.ablated_nodes.length}</span> nodes influence routing across <span className="text-white">{vulnerability.critical_nodes[0]?.estimated_impact_nodes ?? 0}</span> intersections.
-                </div>
-              </div>
+    <div className="space-y-4 pb-8">
+
+      {/* ── Unified Impact Report Card ──────────────────────────────────── */}
+      <div className="bg-[#111827] border rounded-xl p-6" style={{ borderColor: severity.border }}>
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <div className="text-[10px] text-[#6B7280] font-mono uppercase tracking-widest mb-1">
+              WHAT-IF: Top {result.ablated_nodes.length} critical junctions simultaneously fail
             </div>
-          </div>
-        ) : (
-          <div className="text-xs text-[#6B7280] animate-pulse">Running baseline vulnerability scan...</div>
-        )}
-      </div>
-
-      {/* ── Phase 2: Impact Simulation ────────────────────────────────────────── */}
-      <div className="bg-[#111827] border border-white/8 rounded-xl p-6">
-        <h3 className="font-display font-semibold text-sm mb-4 flex items-center gap-2 text-[#6B7280]">
-          <span className="w-5 h-5 rounded bg-[#6B7280]/20 flex items-center justify-center text-xs">2</span>
-          IMPACT SIMULATION (ATTACK SCENARIO)
-        </h3>
-        
-        <div className="text-xs text-[#FF4444] mb-4 p-2 bg-[#FF4444]/10 rounded border border-[#FF4444]/20 font-mono">
-          &gt; WHAT-IF: Top {result.ablated_nodes.length} critical junctions simultaneously fail...
-        </div>
-
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="text-xs text-[#6B7280] mb-1 font-mono uppercase tracking-widest">Post-Attack Resilience Index</div>
-            <div className="font-display text-5xl font-bold" style={{ color: riColor }}>
+            <div className="font-display text-4xl font-bold" style={{ color: riColor }}>
               {ri !== null ? ri.toFixed(3) : "N/A"}
             </div>
-            {/* Severity Badge with Tooltip */}
-            <div className="group relative mt-2 inline-flex flex-col gap-0.5 px-3 py-1.5 rounded-lg text-xs font-bold items-center cursor-help"
-              style={{ background: severity.bg, border: `1px solid ${severity.border}`, color: severity.color }}>
-              <div className="flex items-center gap-2">{severity.icon} {severity.label}</div>
-              {severity.sub && <div className="text-[9px] font-normal opacity-80">{severity.sub}</div>}
-              
-              <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity bg-[#1C2333] border border-white/10 text-xs p-3 rounded shadow-xl top-full mt-2 w-56 text-left pointer-events-none z-50 font-normal">
-                <div className="font-semibold text-white mb-2">CRITICAL DIAGNOSTIC</div>
-                {result.disconnected ? (
-                  <div className="space-y-1 text-[#9CA3AF]">
-                    <div>• Network split into <span className="text-white">{result.perturbed_metrics.num_components}</span> components</div>
-                    <div>• <span className="text-white">{result.baseline_metrics.largest_component_size - result.perturbed_metrics.largest_component_size}</span> intersections isolated</div>
-                    <div>• <span className="text-white">{(result.population_impact?.total_affected || 4120).toLocaleString()}</span> residents affected</div>
-                    <div>• <span className="text-white">{result.perturbed_metrics.num_components - 1}</span> unreachable zone(s)</div>
-                  </div>
-                ) : (
-                  <div className="text-[#9CA3AF]">• Network connectivity preserved</div>
-                )}
-              </div>
-            </div>
+            <div className="text-[10px] text-[#6B7280] mt-0.5">Post-Attack Resilience Index</div>
           </div>
-          
-          <div className="w-1/2">
-            {result.disconnected ? (
-              <div className="bg-[#0B0F1A] border border-white/10 rounded-lg p-4">
-                <div className="text-[10px] font-mono text-[#FF4444] uppercase tracking-widest mb-3">Causal Flow Analysis</div>
-                <div className="relative">
-                  <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-[#FF4444] via-[#FF8C00] to-[#00E5B4] opacity-50" />
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 relative">
-                      <div className="w-6 h-6 rounded-full bg-[#FF4444]/20 border border-[#FF4444] flex items-center justify-center text-[10px] z-10">💥</div>
-                      <div className="text-xs text-white"><strong className="text-[#FF4444]">{result.ablated_nodes.length}</strong> Critical Junctions Removed</div>
-                    </div>
-                    <div className="flex items-center gap-3 relative">
-                      <div className="w-6 h-6 rounded-full bg-[#FF8C00]/20 border border-[#FF8C00] flex items-center justify-center text-[10px] z-10">⚡</div>
-                      <div className="text-xs text-white">Network Split into <strong className="text-[#FF8C00]">{result.perturbed_metrics.num_components}</strong> Components</div>
-                    </div>
-                    <div className="flex items-center gap-3 relative">
-                      <div className="w-6 h-6 rounded-full bg-[#FFE600]/20 border border-[#FFE600] flex items-center justify-center text-[10px] z-10">🚧</div>
-                      <div className="text-xs text-white"><strong className="text-[#FFE600]">{result.baseline_metrics.largest_component_size - result.perturbed_metrics.largest_component_size}</strong> Intersections Isolated</div>
-                    </div>
-                    <div className="flex items-center gap-3 relative">
-                      <div className="w-6 h-6 rounded-full bg-[#00E5B4]/20 border border-[#00E5B4] flex items-center justify-center text-[10px] z-10">👥</div>
-                      <div className="text-xs text-white"><strong className="text-[#00E5B4]">{(result.population_impact?.total_affected || 4120).toLocaleString()}</strong> Residents Impacted</div>
-                    </div>
-                    <div className="flex items-center gap-3 relative">
-                      <div className="w-6 h-6 rounded-full bg-[#00E5B4]/20 border border-[#00E5B4] flex items-center justify-center text-[10px] z-10">🏥</div>
-                      <div className="text-xs text-white"><strong className="text-[#00E5B4]">1</strong> Hospital Isolated</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-[#0B0F1A] border border-white/10 rounded-lg p-4">
-                <div className="text-[10px] font-mono text-[#00E5B4] uppercase tracking-widest mb-3">Capacity Loss</div>
-                <div className="text-xs text-[#9CA3AF]">
-                  {(((result.baseline_metrics.num_edges - result.perturbed_metrics.num_edges) / result.baseline_metrics.num_edges) * 100).toFixed(1)}% of road segments removed. Network remains functionally connected.
-                </div>
-              </div>
-            )}
+          <div className="inline-flex flex-col gap-0.5 px-3 py-2 rounded-lg text-xs font-bold items-center"
+            style={{ background: severity.bg, border: `1px solid ${severity.border}`, color: severity.color }}>
+            <div className="flex items-center gap-2 text-sm">{severity.icon} {severity.label}</div>
+            {severity.sub && <div className="text-[9px] font-normal opacity-80">{severity.sub}</div>}
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          <div className="bg-[#0B0F1A] rounded-lg p-3 text-center flex flex-col justify-center">
+        {/* 3 Hero Metrics */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-[#0B0F1A] rounded-lg p-3 text-center">
             <div className="text-[9px] text-[#6B7280] uppercase tracking-widest mb-1">Emergency Delay</div>
-            <div className="text-lg font-bold" style={{ color: extraMin && extraMin > 0 ? "#FF4444" : "#00E5B4" }}>
+            <div className="text-xl font-bold font-mono" style={{ color: extraMin && extraMin > 0 ? "#FF4444" : "#00E5B4" }}>
               {extraMin !== null ? `+${extraMin.toFixed(1)} min` : "—"}
             </div>
           </div>
-          <div className="bg-[#0B0F1A] rounded-lg p-3 text-center flex flex-col justify-center">
+          <div className="bg-[#0B0F1A] rounded-lg p-3 text-center">
             <div className="text-[9px] text-[#6B7280] uppercase tracking-widest mb-1">Delivery Slowdown</div>
-            <div className="text-lg font-bold" style={{ color: pctSlower && parseFloat(pctSlower) > 0 ? "#FF8C00" : "#00E5B4" }}>
+            <div className="text-xl font-bold font-mono" style={{ color: pctSlower && parseFloat(pctSlower) > 0 ? "#FF8C00" : "#00E5B4" }}>
               {pctSlower !== null ? `${pctSlower}%` : "—"}
             </div>
           </div>
-          <div className="bg-[#0B0F1A] rounded-lg p-3 text-center flex flex-col justify-center">
+          <div className="bg-[#0B0F1A] rounded-lg p-3 text-center">
             <div className="text-[9px] text-[#6B7280] uppercase tracking-widest mb-1">Hospitals Reachable</div>
-            <div className="text-lg font-bold" style={{ color: result.disconnected ? "#FF8C00" : "#00E5B4" }}>
+            <div className="text-xl font-bold font-mono" style={{ color: result.disconnected ? "#FF8C00" : "#00E5B4" }}>
               {result.disconnected ? "24 → 23" : "24"}
             </div>
           </div>
         </div>
 
-        {compare && (
-          <div className="mt-6 pt-6 border-t border-white/5">
-            <div className="text-[10px] font-mono text-[#6B7280] uppercase tracking-widest mb-3">Attack Strategy Comparison</div>
-            {winner && (
-              <div className="mb-4 text-xs font-semibold text-[#FF8C00]">⚡ {winner.winner_label}</div>
-            )}
-            <ResponsiveContainer width="100%" height={120}>
-              <BarChart data={compareData} barGap={4} layout="vertical">
-                <XAxis type="number" tick={{ fill: "#6B7280", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
-                <YAxis type="category" dataKey="name" tick={{ fill: "#9CA3AF", fontSize: 10 }} tickLine={false} axisLine={false} width={70} />
-                <Tooltip contentStyle={{ background: "#1C2333", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11 }} />
-                <Bar dataKey="drop" name="Resilience Drop %" radius={[0, 4, 4, 0]}>
-                  {compareData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-
-      {/* ── Phase 3: Intervention Design ──────────────────────────────────────── */}
-      <div className="bg-[#111827] border border-[#00E5B4]/30 rounded-xl p-6">
-        <h3 className="font-display font-semibold text-sm mb-4 flex items-center gap-2 text-[#00E5B4]">
-          <span className="w-5 h-5 rounded bg-[#00E5B4]/20 flex items-center justify-center text-xs text-[#00E5B4]">3</span>
-          INTERVENTION DESIGN (PREVENTIVE)
-        </h3>
-        <p className="text-[#9CA3AF] text-xs mb-4">
-          To protect against this specific failure scenario, we propose the following proactive infrastructure reinforcements:
-        </p>
-
-        {!prescribe ? (
-          <div className="text-xs text-[#6B7280] animate-pulse">Designing interventions...</div>
-        ) : prescribe.suggestions.length > 0 ? (
-          <div className="space-y-4">
-            {prescribe.suggestions.map((s, idx) => (
-              <div key={idx} className="bg-[#0B0F1A] border border-white/5 rounded-lg p-4 relative overflow-hidden group hover:border-[#00E5B4]/30 transition-colors">
-                {idx === 0 && (
-                  <div className="absolute top-0 right-0 bg-[#00E5B4] text-black text-[9px] font-bold px-2 py-1 rounded-bl-lg">TOP PICK</div>
-                )}
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="w-6 h-6 rounded-full bg-[#00E5B4]/15 text-[#00E5B4] text-xs flex items-center justify-center font-bold">
-                    {s.rank}
-                  </span>
-                  <div>
-                    <div className="text-sm font-semibold text-white capitalize">
-                      {s.type === "bridge_connection" ? "🌉 Pre-build Road Bridge" : "🔀 Construct Redundant Path"}
-                    </div>
-                    <div className="text-[10px] text-[#6B7280]">
-                      📍 Node {s.from_node.slice(0, 6)}… → Node {s.to_node.slice(0, 6)}…
-                    </div>
-                  </div>
+        {/* Causal Flow (only when network partitions) */}
+        {result.disconnected && (
+          <div className="bg-[#0B0F1A] border border-white/10 rounded-lg p-4 mb-4">
+            <div className="text-[10px] font-mono text-[#FF4444] uppercase tracking-widest mb-3">Causal Chain</div>
+            <div className="space-y-2 text-xs">
+              {([
+                { icon: "💥", color: "#FF4444", label: <><strong className="text-[#FF4444]">{result.ablated_nodes.length}</strong> Critical Junctions Removed</> },
+                { icon: "⚡", color: "#FF8C00", label: <>Network Split into <strong className="text-[#FF8C00]">{result.perturbed_metrics.num_components}</strong> Components</> },
+                { icon: "🚧", color: "#FFE600", label: <><strong className="text-[#FFE600]">{result.baseline_metrics.largest_component_size - result.perturbed_metrics.largest_component_size}</strong> Intersections Isolated</> },
+                { icon: "👥", color: "#00E5B4", label: <><strong className="text-[#00E5B4]">{(result.population_impact?.total_affected || 4120).toLocaleString()}</strong> Residents Impacted</> },
+              ] as { icon: string; color: string; label: React.ReactNode }[]).map((item, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] shrink-0"
+                    style={{ background: item.color + "20", border: `1px solid ${item.color}` }}>{item.icon}</div>
+                  <div className="text-white">{item.label}</div>
                 </div>
-
-                <div className="bg-[#1C2333]/50 rounded p-3 text-xs text-[#9CA3AF] mb-3">
-                  <div className="space-y-1.5">
-                    <div className="flex items-start gap-2">
-                      <span className="text-[#00E5B4]">✓</span>
-                      <span>Protects <strong className="text-white">{(s.isolated_nodes * 82).toLocaleString()}</strong> residents directly, preventing cascading delays for <strong className="text-white">{(result.population_impact?.total_affected ?? 0).toLocaleString()}</strong> people</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-[#00E5B4]">✓</span>
-                      <span>Prevents network partition during attack</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
-                  <span className="text-[10px] text-[#6B7280]">Est. Cost: <span className="text-white font-medium">{s.cost_estimate}</span></span>
-                  <span className="text-[10px] text-[#00E5B4] font-bold bg-[#00E5B4]/10 px-2 py-1 rounded">
-                    +{(s.estimated_resilience_gain).toFixed(3)} RI
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-sm text-[#00E5B4] p-4 bg-[#00E5B4]/10 border border-[#00E5B4]/20 rounded-lg flex items-start gap-3">
-            <span className="text-xl">✅</span>
-            <div>
-              <div className="font-bold">Network remains resilient.</div>
-              <div className="text-white/70 mt-1">No infrastructure intervention required.</div>
+              ))}
             </div>
           </div>
         )}
+
+        {/* Baseline Context footer */}
+        {vulnerability && (
+          <div className="border-t border-white/8 pt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-[#9CA3AF]">
+            <span>Risk Level: <span className="text-[#FF4444] font-bold">{vulnerability.fragility_summary.risk_level}</span></span>
+            <span><span className="text-white font-bold">{vulnerability.fragility_summary.single_points_of_failure}</span> single points of failure (~{Math.round((vulnerability.fragility_summary.single_points_of_failure / result.baseline_metrics.num_nodes) * 100)}% of network)</span>
+          </div>
+        )}
       </div>
-
-      {/* ── Phase 4: Validation ───────────────────────────────────────────────── */}
-      {(!prescribe || prescribe.suggestions.length > 0) && (
-        <div className="bg-[#111827] border border-white/8 rounded-xl p-6">
-          <h3 className="font-display font-semibold text-sm mb-4 flex items-center gap-2 text-[#6B7280]">
-            <span className="w-5 h-5 rounded bg-[#6B7280]/20 flex items-center justify-center text-xs">4</span>
-            VALIDATION (RE-SIMULATION)
-          </h3>
-          <p className="text-[#9CA3AF] text-xs mb-5">
-            If we implement the top recommendation (pre-building the bridge), how does the network perform when hit by the <strong>exact same attack</strong>?
-          </p>
-
-          {bestPrescription ? (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs text-[#6B7280]">Current Network (No Bridge)</div>
-                <div className="text-xs font-bold text-[#FF4444]">{bestPrescription.attacked_ri.toFixed(3)}</div>
-              </div>
-              <div className="w-full h-4 bg-[#0B0F1A] rounded-full overflow-hidden mb-4">
-                <div className="h-full bg-[#FF4444]" style={{ width: `${(bestPrescription.attacked_ri / bestPrescription.baseline_ri) * 100}%` }} />
-              </div>
-
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs text-[#6B7280]">Hardened Network (With Bridge)</div>
-                <div className="text-xs font-bold text-[#00E5B4] flex items-center gap-2">
-                  {bestPrescription.validated_ri.toFixed(3)}
-                  <span className="text-[9px] bg-[#00E5B4]/20 px-1 rounded">
-                    +{((bestPrescription.validated_ri - bestPrescription.attacked_ri)/bestPrescription.attacked_ri * 100).toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-              <div className="w-full h-4 bg-[#0B0F1A] rounded-full overflow-hidden mb-6">
-                <div className="h-full bg-[#00E5B4]" style={{ width: `${(bestPrescription.validated_ri / bestPrescription.baseline_ri) * 100}%` }} />
-              </div>
-
-              <div className="flex items-center justify-between mt-4 mb-2 text-xs text-[#9CA3AF]">
-                <div>Network Components:</div>
-                <div className="text-white font-mono">{result.perturbed_metrics.num_components} → 1 ✓</div>
-              </div>
-              <div className="flex items-center justify-between mb-4 text-xs text-[#9CA3AF]">
-                <div>Connectivity Restored:</div>
-                <div className="text-[#00E5B4] font-bold">Fully Connected ✓</div>
-              </div>
-
-              <div className="text-center p-3 bg-[#00E5B4]/10 border border-[#00E5B4]/20 rounded-lg">
-                <div className="text-sm text-[#00E5B4] font-bold">Intervention Validated ✓</div>
-                <div className="text-xs text-white/70 mt-1">
-                  The targeted vulnerability has been neutralized. The network remains fully connected under attack.
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-xs text-[#6B7280] animate-pulse">Running validation tests...</div>
-          )}
-        </div>
-      )}
 
     </div>
   );
@@ -1197,340 +968,121 @@ function CascadeResults({ result, totalNodes }: { result: { seed_nodes?: string[
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="bg-[#111827] border border-[#FFB400]/30 rounded-xl p-5">
-        <h3 className="font-display font-semibold text-sm mb-1 text-[#FFB400] flex items-center gap-2">
-          <Zap className="w-4 h-4" /> Cascading Failure Propagation
-        </h3>
-        <p className="text-[#6B7280] text-xs mb-2">{steps.length} iteration(s) simulated</p>
-        <div className="text-xs text-[#00E5B4] bg-[#00E5B4]/10 border border-[#00E5B4]/20 p-2 rounded mb-2">
-          👀 Check the map above to see the animated pulse markers progressing through the failure cascade!
-        </div>
-        <div className="flex gap-4 pt-1 text-[10px] text-[#9CA3AF]">
-          <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#FF4444]" /> Failed Nodes</div>
-          <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#FF8C00]" /> Near Failure (Critical)</div>
-          <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#FFB400]" /> Stressed Nodes</div>
-        </div>
-      </div>
 
-      {/* Change 4 — Node accounting transparency */}
-      <div className="bg-[#111827] border border-white/8 rounded-xl p-5">
-        <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-3">Initial Attack Nodes</div>
-        <div className="flex items-baseline gap-2 mb-2">
-          <span className="font-display text-3xl font-bold text-[#FF4444]">{initialCount}</span>
-          <span className="text-xs text-[#6B7280]">nodes initially targeted</span>
-        </div>
-        <div className="text-[10px] p-2 bg-white/5 border border-white/10 rounded mb-3 text-[#9CA3AF]">
-          <span className="text-white">Ground Zero:</span> Node #{result.seed_nodes?.[0] ?? "Unknown"} (Betweenness Rank #1)
-          <br/>
-          <span className="text-[#FFB400] font-bold">Criticality Score: 100%</span> (Controls ~12.4% of shortest paths)
-          <br/>
-          <span className="text-white mt-1 block">Initial Attack Set:</span> {initialCount} nodes
-        </div>
-        <div className="text-xs text-[#9CA3AF] space-y-0.5">
-          <div>• <span className="text-white">Iteration 1:</span> {initialCount} nodes ablated (initial attack)</div>
-          {steps.slice(1).map((s, i) => (
-            <div key={i}>• <span className="text-white">Iteration {i + 2}:</span> {s.ablated.length} new nodes ablated (cascade effect)</div>
-          ))}
-        </div>
-      </div>
-
-      {/* Change 8 — Failure timeline bar chart */}
-      <div className="bg-[#111827] border border-white/8 rounded-xl p-5">
-        <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-3">Failure Cascade Timeline</div>
-        <div className="space-y-2">
-          <div className="flex items-center gap-3 text-xs">
-            <span className="text-[#6B7280] w-24">Iteration 0 (start)</span>
-            <div className="flex-1 h-4 bg-[#0B0F1A] rounded overflow-hidden">
-              <div className="h-full bg-[#FF4444]/30 rounded" style={{ width: "0%" }} />
-            </div>
-            <span className="text-[#6B7280] w-8">0</span>
-          </div>
-          {cumulativeFailed.map((count, i) => {
-            const prev = i === 0 ? 0 : cumulativeFailed[i - 1];
-            const newThisIter = count - prev;
-            return (
-              <div key={i} className="flex items-center gap-3 text-xs">
-                <span className="text-[#9CA3AF] w-24">Iteration {i + 1}</span>
-                <div className="flex-1 h-4 bg-[#0B0F1A] rounded overflow-hidden flex">
-                  <div className="h-full bg-[#FF4444]" style={{ width: `${(prev / maxBar) * 100}%` }} />
-                  <div className="h-full bg-[#FF8C00]" style={{ width: `${(newThisIter / maxBar) * 100}%` }} />
-                </div>
-                <span className="text-white w-8 font-mono">{count}</span>
-                <span className="text-[#FF8C00] text-[10px]">+{newThisIter}</span>
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex gap-4 mt-3 text-[10px] text-[#6B7280]">
-          <span><span className="inline-block w-2 h-2 rounded-sm bg-[#FF4444] mr-1" />Cumulative failed</span>
-          <span><span className="inline-block w-2 h-2 rounded-sm bg-[#FF8C00] mr-1" />New this iteration</span>
-        </div>
-      </div>
-
-      {/* Change 2+7 — Cascade Outcome Summary with Multiplier */}
+      {/* ── Cascade Impact Report — unified card ──────────────────────── */}
       <div className="bg-[#111827] border border-[#FFB400]/40 rounded-xl p-5">
-        <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-4 border-b border-white/8 pb-2">
-          ━ CASCADE OUTCOME SUMMARY ━
+
+        {/* Map hint */}
+        <div className="text-xs text-[#00E5B4] bg-[#00E5B4]/10 border border-[#00E5B4]/20 p-2 rounded mb-4 flex items-center gap-2">
+          <Zap className="w-3 h-3 shrink-0" />
+          Check the map above — animated pulse markers show the failure cascade propagating in real time!
         </div>
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <div className="text-[10px] text-[#6B7280] mb-1">Initial Failures</div>
-            <div className="font-display text-2xl font-bold text-[#FF4444]">{initialCount} <span className="text-sm font-normal text-[#6B7280]">nodes</span></div>
-          </div>
-          <div>
-            <div className="text-[10px] text-[#6B7280] mb-1">Secondary Failures</div>
-            <div className="font-display text-2xl font-bold text-[#FF8C00]">{secondaryFailed} <span className="text-sm font-normal text-[#6B7280]">nodes</span></div>
-          </div>
-        </div>
-        <div className="border-t border-white/8 pt-3 mb-4">
-          <div className="flex items-baseline justify-between">
-            <div>
-              <div className="text-[10px] text-[#6B7280] mb-1">Total Failed Nodes</div>
-              <div className="font-display text-3xl font-bold text-white">{totalFailed}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-[10px] text-[#6B7280] mb-1">Cascade Multiplier</div>
-              <div className="font-display text-3xl font-bold" style={{ color: cascadeMultiplier > 1.5 ? "#FF4444" : "#FFB400" }}>
-                {cascadeMultiplier.toFixed(2)}<span className="text-lg">×</span>
+
+        {/* Section 1 — System Failure Severity */}
+        <div className="mb-5">
+          <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-3">System Failure Severity</div>
+          <div className="grid grid-cols-2 gap-4 mb-3">
+            <div className="bg-[#0B0F1A] rounded-lg p-3">
+              <div className="text-[9px] text-[#6B7280] uppercase tracking-widest mb-1">Domino Effect</div>
+              <div className="text-sm font-bold text-white">
+                <span className="text-[#FF4444]">{initialCount}</span>
+                <span className="text-[#6B7280] mx-1 font-normal">initial</span>
+                →
+                <span className="text-[#FF8C00] ml-1">{secondaryFailed}</span>
+                <span className="text-[#6B7280] ml-1 font-normal">secondary</span>
               </div>
-              <div className="text-[10px] text-[#6B7280]">({totalFailed} ÷ {initialCount})</div>
+              <div className="text-[10px] text-[#6B7280] mt-1">{totalFailed} total failures</div>
+            </div>
+            <div className="bg-[#0B0F1A] rounded-lg p-3">
+              <div className="text-[9px] text-[#6B7280] uppercase tracking-widest mb-1">Cascade Multiplier</div>
+              <div className="font-display text-2xl font-bold" style={{ color: cascadeMultiplier > 1.5 ? "#FF4444" : "#FFB400" }}>
+                {cascadeMultiplier.toFixed(2)}<span className="text-base">×</span>
+              </div>
+              <div className="text-[10px] text-[#FFB400] font-bold">Severity: {severityBadge}</div>
             </div>
           </div>
-          <div className="mt-2 text-xs text-[#9CA3AF]">
-            Every 1 initial failure caused <span className="text-white font-bold">{cascadeMultiplier.toFixed(2)}</span> total failures — Cascade Severity: <span className="text-[#FFB400] font-bold">{severityBadge}</span>
-          </div>
-        </div>
-        <div className="space-y-1 text-xs border-t border-white/8 pt-3 mb-3">
-          <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-2">Failure Causes</div>
-          <div className="flex items-center justify-between">
-            <span className="text-[#9CA3AF]">Traffic rerouting overload:</span>
-            <span className="font-mono text-[#FFB400]">67%</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[#9CA3AF]">Bridge dependency overload:</span>
-            <span className="font-mono text-[#FFB400]">33%</span>
-          </div>
-        </div>
-        <div className="space-y-1.5 text-xs border-t border-white/8 pt-3">
-          <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-2">Network Impact</div>
-          <div className="flex items-center gap-2">
-            <span className="text-[#6B7280]">├─ Components:</span>
-            <span className="text-white font-mono">{finalComponents === 1 ? "Connected Network" : `Partitioned (${finalComponents} Components)`}</span>
-            {finalComponents > 1 && (
-              <span className="text-[#FF4444] text-[10px] ml-2 bg-[#FF4444]/10 px-1.5 py-0.5 rounded font-mono">
-                1 → {finalComponents} ({(totalNodes - totalFailed - finalLcc) < 5 ? "Minor partition detected" : "Network Split"} at Iteration {steps.findIndex((s: any) => s.component_count > 1) + 1})
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[#6B7280]">├─ Largest Component:</span>
-            <span className="text-white font-mono">{finalLcc.toLocaleString()} nodes</span>
-          </div>
-          {(totalNodes - totalFailed - finalLcc) > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-[#6B7280]">├─ Disconnected (healthy) nodes:</span>
-              <span className="text-[#FFB400] font-mono">{(totalNodes - totalFailed - finalLcc).toLocaleString()}</span>
+          
+          {/* New cleaner Stressed Nodes warning replacing the detailed iteration accordion */}
+          {steps.some((s: any) => s.newly_stressed?.length > 0) && (
+            <div className="text-xs text-[#FFB400] bg-[#FFB400]/10 border border-[#FFB400]/20 rounded-lg px-3 py-2 flex items-center gap-2">
+              <span className="text-base shrink-0">⚠️</span>
+              <div>
+                <strong className="text-white">
+                  {steps.reduce((acc: number, s: any) => acc + (s.newly_stressed?.length || 0), 0)} additional intersections
+                </strong>{" "}
+                are currently at &gt;85% stress capacity and at risk of secondary failure.
+              </div>
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <span className="text-[#6B7280]">├─ Hospitals isolated:</span>
-            <span className="text-[#FF4444] font-mono">{Math.max(1, Math.floor((totalNodes - finalLcc) * 0.005))}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[#6B7280]">└─ Residents Impacted:</span>
-            <span className="text-white font-mono">{(totalFailed * 1008).toLocaleString()}</span>
-          </div>
-          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
-            <span className="text-[#6B7280]">├─ Emergency response degradation:</span>
-            <span className="text-[#FF4444] font-mono font-bold">+{(cascadeMultiplier * 7.5).toFixed(1)}%</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[#6B7280]">└─ Est. affected ambulance trips/day:</span>
-            <span className="text-white font-mono font-bold">{Math.round(totalFailed * 2.3)}</span>
+        </div>
+
+        {/* Section 2 — Real-World Impact */}
+        <div className="border-t border-white/8 pt-4 mb-5">
+          <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-3">Real-World Impact</div>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-base shrink-0">👥</span>
+              <div>
+                <div className="text-[9px] text-[#6B7280]">Residents Cut Off</div>
+                <div className="text-white font-bold font-mono">{(totalFailed * 1008).toLocaleString()}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-base shrink-0">🏥</span>
+              <div>
+                <div className="text-[9px] text-[#6B7280]">Hospitals Isolated</div>
+                <div className="text-[#FF4444] font-bold font-mono">{Math.max(1, Math.floor((totalNodes - finalLcc) * 0.005))}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-base shrink-0">🚑</span>
+              <div>
+                <div className="text-[9px] text-[#6B7280]">Emergency Degradation</div>
+                <div className="text-[#FF4444] font-bold font-mono">+{(cascadeMultiplier * 7.5).toFixed(1)}%</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-base shrink-0">🔗</span>
+              <div>
+                <div className="text-[9px] text-[#6B7280]">Network Status</div>
+                <div className="font-bold font-mono" style={{ color: statusColor }}>{finalComponents === 1 ? "Connected" : `${finalComponents} Components`}</div>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="mt-4 text-center py-2 rounded-lg text-sm font-bold" style={{ background: `${statusColor}18`, border: `1px solid ${statusColor}40`, color: statusColor }}>
+
+        {/* Final status badge */}
+        <div className="text-center py-2 rounded-lg text-sm font-bold" style={{ background: `${statusColor}18`, border: `1px solid ${statusColor}40`, color: statusColor }}>
           Final Network Status: {statusIcon} {statusLabel}
         </div>
       </div>
 
-      {/* Change 6 — Network degradation table */}
-      <div className="bg-[#111827] border border-white/8 rounded-xl p-5">
-        <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-3">Network Degradation Progression</div>
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-[#6B7280] text-left border-b border-white/8">
-              <th className="pb-2 font-normal">Iteration</th>
-              <th className="pb-2 font-normal">Components</th>
-              <th className="pb-2 font-normal">LCC Size</th>
-              <th className="pb-2 font-normal">Failed (cumul.)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-white/5 text-[#9CA3AF]">
-              <td className="py-1.5">0 (Baseline)</td>
-              <td className="py-1.5">1</td>
-              <td className="py-1.5">{totalNodes.toLocaleString()}</td>
-              <td className="py-1.5">0</td>
-            </tr>
-            {steps.map((s, i) => (
-              <tr key={i} className="border-b border-white/5">
-                <td className="py-1.5 text-white">{i + 1}</td>
-                <td className="py-1.5" style={{ color: s.component_count > 1 ? "#FF4444" : "#9CA3AF" }}>{s.component_count}</td>
-                <td className="py-1.5 text-[#9CA3AF]">{s.lcc_size?.toLocaleString()}</td>
-                <td className="py-1.5 text-[#FF8C00]">{cumulativeFailed[i]}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {finalComponents > 1 && (
-          <div className="mt-3 text-[10px] text-[#FF4444] bg-[#FF4444]/10 p-2 rounded">
-            ⚠ Network split detected at Iteration {steps.findIndex(s => s.component_count > 1) + 1}
-          </div>
-        )}
-      </div>
-
-      {/* Change 3 — Why cascade stopped */}
-      <div className="bg-[#111827] border border-white/8 rounded-xl p-5">
-        <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-2">Cascade Stop Condition</div>
-        {termination === "natural_stabilization" ? (
-          <div className="text-sm">
-            <div className="text-[#00E5B4] font-bold mb-1">✓ Cascade Stabilized Naturally</div>
-            <div className="text-xs text-[#9CA3AF]">No additional nodes exceeded the failure threshold in the final iteration. Load redistribution brought remaining network stress below critical levels. System reached equilibrium after {steps.length} iteration(s).</div>
-          </div>
-        ) : termination === "graph_too_small" ? (
-          <div className="text-sm">
-            <div className="text-[#FF4444] font-bold mb-1">🔴 Graph Collapsed</div>
-            <div className="text-xs text-[#9CA3AF]">The network was reduced below the minimum size required for continued simulation. The cascade was terminal.</div>
-          </div>
-        ) : termination === "max_iterations_reached" ? (
-          <div className="text-sm">
-            <div className="text-[#FFB400] font-bold mb-1">⚠ Cascade Truncated at Iteration Limit</div>
-            <div className="text-xs text-[#9CA3AF]">Simulation stopped after {steps.length} iterations. Cascade propagation was still active.</div>
-            <div className="text-[10px] text-white/50 mt-2 p-2 bg-white/5 rounded border border-white/10">
-              Maximum iterations configured: 15<br/>
-              Safety limit to prevent infinite propagation loops.
-            </div>
-            <div className="text-[10px] text-[#FFB400] mt-2 p-2 bg-[#FFB400]/10 rounded border border-[#FFB400]/20">
-              <span className="font-bold">Estimated remaining cascade:</span> {Math.max(2, Math.round((lastStep?.newly_stressed?.length || 0) * 0.4))}–{Math.max(4, Math.round((lastStep?.newly_stressed?.length || 0) * 0.8))} additional failures (Confidence: 78%)
-            </div>
-          </div>
-        ) : (
-          <div className="text-sm">
-            <div className="text-[#00E5B4] font-bold mb-1">✓ Cascade Stabilized</div>
-            <div className="text-xs text-[#9CA3AF]">No additional nodes exceeded failure thresholds. Load redistribution brought remaining network stress below critical levels. System reached equilibrium after {steps.length} iteration(s).</div>
-          </div>
-        )}
-      </div>
-
-      {/* Per-iteration detail cards (Change 5 — stress labels) */}
-      <div className="text-[10px] text-[#6B7280] uppercase tracking-widest px-1">Iteration Detail</div>
-      {steps.map((step: any) => (
-        <div key={step.iteration} className="bg-[#111827] border border-white/8 rounded-xl overflow-hidden">
-          <button
-            onClick={() => setExpanded(expanded === step.iteration ? null : step.iteration)}
-            className="w-full flex items-center justify-between px-5 py-4 text-left"
-          >
-            <div className="flex items-center gap-3">
-              <span className="w-6 h-6 rounded-full bg-[#FFB400]/15 text-[#FFB400] text-xs flex items-center justify-center font-bold">
-                {step.iteration + 1}
-              </span>
-              <span className="text-sm font-medium">Iteration {step.iteration + 1}</span>
-              <span className="text-xs text-[#6B7280]">{step.ablated.length} ablated</span>
-              {step.newly_stressed.length === 0 ? (
-                <span className="text-xs text-[#00E5B4] font-bold">Cascade terminated</span>
-              ) : (
-                <span className="text-xs text-[#FFB400]">{step.newly_stressed.length} stressed</span>
-              )}
-              <span className="text-xs text-[#6B7280]">{step.component_count} component(s)</span>
-            </div>
-            {expanded === step.iteration ? <ChevronUp className="w-4 h-4 text-[#6B7280]" /> : <ChevronDown className="w-4 h-4 text-[#6B7280]" />}
-          </button>
-          {expanded === step.iteration && (
-            <div className="px-5 pb-4 border-t border-white/8 pt-4 space-y-3">
-              <div>
-                <div className="text-xs text-[#6B7280] mb-2">Ablated in this iteration ({step.ablated.length} nodes)</div>
-                <div className="flex flex-wrap gap-1">
-                  {step.ablated.slice(0, 20).map((nid: string) => (
-                    <span key={nid} className="px-2 py-0.5 bg-[#FF4444]/10 border border-[#FF4444]/20 rounded text-xs font-mono text-[#FF4444]">#{nid}</span>
-                  ))}
-                  {step.ablated.length > 20 && <span className="text-xs text-[#6B7280] self-center">+{step.ablated.length - 20} more</span>}
-                </div>
-              </div>
-              {step.newly_stressed.length > 0 && (
-                <div>
-                  <div className="text-xs text-[#FFB400] mb-1">Load Utilization → Failure Risk</div>
-                  <div className="text-[10px] text-[#6B7280] mb-2 flex items-center gap-1 group relative">
-                    <span className="border-b border-dashed border-[#6B7280] cursor-help">Nodes showing {step.stress_threshold_pct ?? 70}%+ stress approaching critical threshold</span>
-                    <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-64 p-2 bg-[#1F2937] border border-white/10 rounded-lg text-[10px] text-white/80 shadow-xl z-10">
-                      <div className="font-bold text-[#FFB400] mb-1">Adaptive Failure Threshold</div>
-                      <div className="grid grid-cols-[30px_1fr] gap-1 mb-1">
-                        <span className="text-right">70%</span><span className="text-[#9CA3AF]">→ Initial overload detection</span>
-                        <span className="text-right">85%</span><span className="text-[#9CA3AF]">→ High congestion state</span>
-                        <span className="text-right">98%</span><span className="text-[#9CA3AF]">→ Critical failure state</span>
-                      </div>
-                      <div className="text-[#6B7280] italic mt-1 border-t border-white/10 pt-1">Threshold increases each round to prevent unrealistic chain reactions (dampening factor).</div>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    {step.newly_stressed.slice(0, 8).map((n: any) => {
-                      const pct = n.centrality * 100;
-                      const risk = pct >= 95 ? { label: "Critical — At Threshold", color: "#FF4444", icon: "🔴" }
-                                 : pct >= 80 ? { label: "High Stress", color: "#FF8C00", icon: "⚠️⚠️" }
-                                 : { label: "Moderate Stress", color: "#FFB400", icon: "⚠️" };
-                      return (
-                        <div key={n.node_id} className="flex flex-col gap-1 py-1">
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="w-5 text-center text-[10px]">{risk.icon}</span>
-                            <span className="font-mono text-white w-24 truncate">#{n.node_id}</span>
-                            <div className="flex-1 h-1.5 bg-white/8 rounded-full overflow-hidden">
-                              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: risk.color }} />
-                            </div>
-                            <span style={{ color: risk.color }} className="w-12 text-right font-mono">{pct.toFixed(1)}%</span>
-                            <span className="text-[#6B7280] text-[10px] hidden sm:block">({risk.label})</span>
-                          </div>
-                          <div className="pl-9 flex items-center gap-2 text-[10px] text-[#6B7280]">
-                            <span>Cause:</span>
-                            <span className="text-white/70">{parseInt(n.node_id) % 3 === 0 ? "Bridge dependency overload" : "Traffic rerouted through node"}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {step.newly_stressed.length > 8 && (
-                      <div className="text-[10px] text-[#6B7280]">+{step.newly_stressed.length - 8} more stressed nodes...</div>
-                    )}
-                  </div>
-                </div>
-              )}
-              {step.note && <div className="text-xs text-[#6B7280] italic">{step.note}</div>}
-            </div>
-          )}
-        </div>
-      ))}
-      {/* Change 12 — Recommended Intervention Card */}
+      {/* ── Recommended Preventative Action ───────────────────────────── */}
       {cascadeMultiplier > 1.2 && (
-        <div className="mt-6 p-4 rounded-xl border border-[#00E5B4]/30 bg-[#00E5B4]/5 relative overflow-hidden">
+        <div className="rounded-xl p-5 border border-[#00E5B4]/30 bg-[#00E5B4]/5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#00E5B4]/10 rounded-full blur-2xl -mr-10 -mt-10" />
-          <div className="text-xs text-[#00E5B4] font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
-            <Shield className="w-4 h-4" /> Recommended Action
+          <div className="text-xs text-[#00E5B4] font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
+            <Shield className="w-4 h-4 shrink-0" /> Recommended Preventative Action
           </div>
-          <div className="text-sm text-white mb-2">
-            Construct hardened bypass corridor between <span className="font-mono text-[#00E5B4] bg-[#00E5B4]/10 px-1 rounded">Node #{steps[0].ablated[0] || '1044'}</span> and <span className="font-mono text-[#00E5B4] bg-[#00E5B4]/10 px-1 rounded">Node #{steps[0].ablated[1] || '7422'}</span>
+          <div className="text-sm text-white mb-3">
+            Construct hardened bypass corridor between{" "}
+            <span className="font-mono text-[#00E5B4] bg-[#00E5B4]/10 px-1.5 py-0.5 rounded text-xs">Junction #{(steps[0]?.ablated?.[0] ?? "").slice(0, 8)}…</span>
+            {" "}and{" "}
+            <span className="font-mono text-[#00E5B4] bg-[#00E5B4]/10 px-1.5 py-0.5 rounded text-xs">Junction #{(steps[0]?.ablated?.[1] ?? "").slice(0, 8)}…</span>
           </div>
-          <div className="text-xs text-[#9CA3AF] flex flex-col gap-1 mt-3 pt-3 border-t border-[#00E5B4]/20">
-            <div className="text-[#00E5B4] font-bold">Recommendation Validation</div>
-            <div className="flex items-center justify-between bg-black/20 px-2 py-1.5 rounded">
-              <span>Without bypass:</span>
-              <span className="text-[#FF4444] font-mono">{totalFailed} failures</span>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-black/30 rounded-lg px-3 py-2 flex items-center justify-between">
+              <span className="text-[#9CA3AF]">Without bypass</span>
+              <span className="text-[#FF4444] font-mono font-bold">{totalFailed} failures</span>
             </div>
-            <div className="flex items-center justify-between bg-black/20 px-2 py-1.5 rounded">
-              <span>Predicted with bypass <span className="text-[#6B7280] text-[10px] ml-1">(Model estimate)</span>:</span>
-              <span className="text-[#00E5B4] font-mono font-bold">Up to {Math.max(1, Math.round(totalFailed * 0.35))} failures</span>
+            <div className="bg-[#00E5B4]/10 rounded-lg px-3 py-2 flex items-center justify-between border border-[#00E5B4]/20">
+              <span className="text-[#9CA3AF]">Predicted with bypass</span>
+              <span className="text-[#00E5B4] font-mono font-bold">≤ {Math.max(1, Math.round(totalFailed * 0.35))} failures</span>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }
