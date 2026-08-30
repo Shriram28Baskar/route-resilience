@@ -182,70 +182,237 @@ def _unreachable_result(reason: str) -> Dict[str, Any]:
     }
 
 
+
+import numpy as np
+from sklearn.cluster import KMeans
+from scipy.spatial.distance import cdist
+import networkx as nx
+import math
+from app.data.population import _get_src, query_population_nodes
+from rasterio.windows import from_bounds
+
+
+import numpy as np
+from sklearn.cluster import KMeans
+from scipy.spatial.distance import cdist
+import networkx as nx
+from app.data.population import _get_src
+from rasterio.windows import from_bounds
+
+def _get_distributed_node_weights(G, target_nodes):
+    '''
+    Retrieves raster population and distributes pixel mass equally among nodes
+    that fall within each pixel. This perfectly prevents double-counting and 
+    ensures sum(node_weights) == sum(unique_pixels).
+    '''
+    src = _get_src()
+    weights = {n: 0.0 for n in target_nodes}
+    if not src:
+        return weights
+    
+    xs = [G.nodes[n].get('x') for n in target_nodes if G.nodes[n].get('x') is not None]
+    ys = [G.nodes[n].get('y') for n in target_nodes if G.nodes[n].get('y') is not None]
+    if not xs or not ys:
+        return weights
+        
+    min_x, max_x = min(xs)-0.005, max(xs)+0.005
+    min_y, max_y = min(ys)-0.005, max(ys)+0.005
+    
+    try:
+        window = from_bounds(min_x, min_y, max_x, max_y, src.transform).round_lengths().round_offsets()
+        data = src.read(1, window=window)
+        win_transform = src.window_transform(window)
+        
+        pixel_to_nodes = {}
+        for n in target_nodes:
+            x, y = G.nodes[n].get('x'), G.nodes[n].get('y')
+            if x and y:
+                col, row = ~win_transform * (x, y)
+                row, col = int(row), int(col)
+                if 0 <= row < data.shape[0] and 0 <= col < data.shape[1]:
+                    pixel_to_nodes.setdefault((row, col), []).append(n)
+                    
+        for (row, col), nodes in pixel_to_nodes.items():
+            val = data[row, col]
+            if val > 0 and val != -99999.0:
+                pop_per_node = float(val) / len(nodes)
+                for n in nodes:
+                    weights[n] = pop_per_node
+    except Exception:
+        pass
+    return weights
+
 def compute_relief_camps(G: nx.Graph, k: int = 3) -> dict:
-    """
-    Finds k optimal relief camp locations by clustering the largest connected component.
-    Uses K-Means clustering to minimize average travel distance to camps, avoiding edge placement.
-    Returns both the camp locations and a catchment_mapping (node_id -> cluster_index) for
-    rendering color-coded catchment zones on the map.
-    """
-    import numpy as np
-    from sklearn.cluster import KMeans
-    from scipy.spatial.distance import cdist
     if not G.nodes():
-        return {"camps": [], "catchment_mapping": {}}
+        return {"camps": [], "catchment_mapping": {}, "metrics": {}}
 
-    if G.is_directed():
-        G_ud = G.to_undirected()
-    else:
-        G_ud = G
-
+    G_ud = G.to_undirected() if G.is_directed() else G
     components = sorted(nx.connected_components(G_ud), key=len, reverse=True)
     if not components:
-        return {"camps": [], "catchment_mapping": {}}
+        return {"camps": [], "catchment_mapping": {}, "metrics": {}}
 
     lcc_nodes = list(components[0])
-
-    catchment_mapping = {}  # node_id (str) -> cluster index (int)
+    unreachable_nodes = set(G.nodes()) - set(lcc_nodes)
+    
+    catchment_mapping = {}
+    catchment_nodes = {i: [] for i in range(k)}
 
     if len(lcc_nodes) <= k:
         camp_nodes = lcc_nodes[:k]
-        # Every node gets assigned to its nearest camp by index
         for i, n in enumerate(lcc_nodes):
-            catchment_mapping[str(n)] = i % len(camp_nodes)
+            c_idx = i % len(camp_nodes)
+            catchment_mapping[str(n)] = c_idx
+            catchment_nodes[c_idx].append(n)
+        weights = _get_distributed_node_weights(G, list(G.nodes()))
+        initial_objective = 0.0
+        final_objective = 0.0
+        camp_distances = {}
+        for i, camp in enumerate(camp_nodes):
+            camp_distances[i] = nx.single_source_dijkstra_path_length(G_ud, camp, weight='time_s')
     else:
+        # Phase 1: Mathematically Coherent Demand Weights (No overlapping/double counting)
+        weights = _get_distributed_node_weights(G, list(G.nodes()))
+        
+        # Phase 2: Spatial K-Means for dispersed heuristic initialization
         coords = np.array([[G_ud.nodes[n].get('x', 0), G_ud.nodes[n].get('y', 0)] for n in lcc_nodes])
         kmeans = KMeans(n_clusters=k, random_state=42, n_init=10).fit(coords)
-        labels = kmeans.labels_
-        centers = kmeans.cluster_centers_
-
-        # Build catchment mapping from KMeans labels
-        for i, n in enumerate(lcc_nodes):
-            catchment_mapping[str(n)] = int(labels[i])
-
+        
         camp_nodes = []
-        for center in centers:
+        for center in kmeans.cluster_centers_:
             distances = cdist([center], coords)[0]
-            closest_idx = np.argmin(distances)
-            camp_nodes.append(lcc_nodes[closest_idx])
+            camp_nodes.append(lcc_nodes[np.argmin(distances)])
 
+        # Calculate Initial Objective
+        initial_objective = 0.0
+        camp_distances = {}
+        for i, camp in enumerate(camp_nodes):
+            camp_distances[i] = nx.single_source_dijkstra_path_length(G_ud, camp, weight='time_s')
+        for n in lcc_nodes:
+            min_d = min((camp_distances[i].get(n, float('inf')) for i in range(k)))
+            initial_objective += (weights.get(n, 0) * min_d)
+
+        # Phase 3: Alternating Location-Allocation (Weighted P-Median Heuristic)
+        # Objective: Minimize Sum(Demand_i * NetworkTravelTime(i, c))
+        for _ in range(2):
+            camp_distances = {}
+            for i, camp in enumerate(camp_nodes):
+                camp_distances[i] = nx.single_source_dijkstra_path_length(G_ud, camp, weight='time_s')
+            
+            # Allocation
+            catchment_nodes = {i: [] for i in range(k)}
+            for n in lcc_nodes:
+                min_dist = float('inf')
+                best_camp = 0
+                for i in range(k):
+                    if n in camp_distances[i] and camp_distances[i][n] < min_dist:
+                        min_dist = camp_distances[i][n]
+                        best_camp = i
+                catchment_mapping[str(n)] = best_camp
+                catchment_nodes[best_camp].append(n)
+                
+            # Location (1-Median Approximation)
+            new_seeds = []
+            for i in range(k):
+                c_nodes = catchment_nodes[i]
+                if not c_nodes:
+                    new_seeds.append(camp_nodes[i])
+                    continue
+                
+                # Sample top 5 highest population nodes + current seed as candidates
+                candidates = sorted(c_nodes, key=lambda n: weights.get(n, 0), reverse=True)[:5]
+                current_seed = camp_nodes[i]
+                if current_seed not in candidates and current_seed in c_nodes:
+                    candidates.append(current_seed)
+                    
+                best_cost = float('inf')
+                best_cand = current_seed
+                
+                for cand in candidates:
+                    dists = nx.single_source_dijkstra_path_length(G_ud, cand, weight='time_s')
+                    cost = sum(weights.get(n, 0) * dists.get(n, float('inf')) for n in c_nodes)
+                    if cost < best_cost:
+                        best_cost = cost
+                        best_cand = cand
+                new_seeds.append(best_cand)
+            camp_nodes = new_seeds
+            
+        # Final Allocation pass
+        camp_distances = {}
+        for i, camp in enumerate(camp_nodes):
+            camp_distances[i] = nx.single_source_dijkstra_path_length(G_ud, camp, weight='time_s')
+            
+        catchment_nodes = {i: [] for i in range(k)}
+        final_objective = 0.0
+        for n in lcc_nodes:
+            min_dist = float('inf')
+            best_camp = 0
+            for i in range(k):
+                if n in camp_distances[i] and camp_distances[i][n] < min_dist:
+                    min_dist = camp_distances[i][n]
+                    best_camp = i
+            catchment_mapping[str(n)] = best_camp
+            catchment_nodes[best_camp].append(n)
+            final_objective += (weights.get(n, 0) * min_dist)
+
+    # 4. Compile Mathematically Coherent Metrics
     results = []
-    for c in camp_nodes:
+    total_weighted_time = 0.0
+    total_pop_served = 0.0
+    worst_case_time = 0.0
+    
+    for i, c in enumerate(camp_nodes):
         data = G.nodes[c]
-        results.append({"id": str(c), "lat": data.get("y"), "lng": data.get("x")})
+        c_nodes = catchment_nodes.get(i, [])
+        
+        # Population is strictly the sum of distributed node weights (NO double counting)
+        camp_pop_served = sum(weights.get(n, 0) for n in c_nodes)
+        
+        camp_weighted_time = 0.0
+        camp_worst_time = 0.0
+        
+        if c_nodes and i in camp_distances:
+            for n in c_nodes:
+                t = camp_distances[i].get(n, 0)
+                p = weights.get(n, 0)
+                camp_weighted_time += (p * t)
+                if t > camp_worst_time:
+                    camp_worst_time = t
+                    
+        total_pop_served += camp_pop_served
+        total_weighted_time += camp_weighted_time
+        if camp_worst_time > worst_case_time:
+            worst_case_time = camp_worst_time
+            
+        mean_resp = (camp_weighted_time / camp_pop_served) if camp_pop_served > 0 else 0
+            
+        results.append({
+            "id": str(c),
+            "lat": data.get("y"),
+            "lng": data.get("x"),
+            "node_count": len(c_nodes),
+            "population_estimate": round(camp_pop_served, 0),
+            "mean_response_time_s": round(mean_resp, 1),
+            "worst_case_time_s": round(camp_worst_time, 1)
+        })
 
-    # Build per-camp population counts (nodes in each catchment)
-    camp_counts = {}
-    for node_id, cluster_idx in catchment_mapping.items():
-        camp_counts[cluster_idx] = camp_counts.get(cluster_idx, 0) + 1
+    global_mean_time = (total_weighted_time / total_pop_served) if total_pop_served > 0 else 0
+    unreachable_pop = sum(weights.get(n, 0) for n in unreachable_nodes if n in weights) if 'weights' in locals() else 0
+    
+    total_network_pop = sum(weights.values())
+    pop_cov = (total_pop_served / total_network_pop * 100) if total_network_pop > 0 else 0.0
+    
+    metrics = {
+        "objective_function": "Minimize Sum(Demand_i * NetworkTravelTime_s)",
+        "initial_objective_value": round(initial_objective, 1) if 'initial_objective' in locals() else 0,
+        "optimized_objective_value": round(final_objective, 1) if 'final_objective' in locals() else 0,
+        "optimization_improvement_pct": round((initial_objective - final_objective) / initial_objective * 100, 1) if initial_objective > 0 else 0.0,
+        "weighted_mean_response_time_s": round(global_mean_time, 1),
+        "worst_case_response_time_s": round(worst_case_time, 1),
+        "unreachable_nodes_count": len(unreachable_nodes),
+        "unreachable_population_estimate": round(unreachable_pop, 0),
+        "total_population_served": round(total_pop_served, 0),
+        "population_coverage_pct": round(pop_cov, 1),
+        "network_coverage_pct": round((len(lcc_nodes) / G.number_of_nodes() * 100) if G.number_of_nodes() > 0 else 0, 1)
+    }
 
-    for i, camp in enumerate(results):
-        camp["node_count"] = camp_counts.get(i, 0)
-        # NOTE: population_estimate deliberately NOT computed here.
-        # The 'node_count' field counts road graph nodes in this camp's catchment zone —
-        # NOT people. Population requires WorldPop raster intersection, which is done
-        # in the accessibility impact endpoint. A node_count * arbitrary_constant
-        # fabrication is explicitly excluded per project data integrity rules.
-
-    return {"camps": results, "catchment_mapping": catchment_mapping}
-
+    return {"camps": results, "catchment_mapping": catchment_mapping, "metrics": metrics}

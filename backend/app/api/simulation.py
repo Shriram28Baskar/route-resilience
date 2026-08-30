@@ -67,6 +67,7 @@ class TimelineRequest(BaseModel):
 
 class FloodRequest(BaseModel):
     water_level: float
+    is_animation: bool = False
 
 class ReliefCampRequest(BaseModel):
     ablated_node_ids: List[str] = []
@@ -109,24 +110,32 @@ async def simulate_flood(req: FloodRequest):
         if u in flooded_set or v in flooded_set:
             road_length_m += data.get('length', 0)
     
-    # Real data: fetch facilities and check intersection
-    s, w, n, e = 12.92, 77.57, 12.99, 77.64
-    hospitals_raw = await fetch_facilities(s, w, n, e, amenities=["hospital", "clinic", "health_post"])
-    emergency_raw = await fetch_facilities(s, w, n, e, amenities=["fire_station", "police", "ambulance_station"])
-    
-    hosp_nodes = _snap_to_graph(G, hospitals_raw)
-    emerg_nodes = _snap_to_graph(G, emergency_raw)
-    
-    hospitals_flooded = sum(1 for node in hosp_nodes if node in flooded_set)
-    emergency_flooded = sum(1 for node in emerg_nodes if node in flooded_set)
-    
-    # Real population data: query WorldPop raster for flooded area
-    pop_result = query_population_nodes(G, flooded)
-    population_affected = pop_result.get("population") or 0
+    if not req.is_animation:
+        # Real data: fetch facilities and check intersection
+        s, w, n, e = 12.92, 77.57, 12.99, 77.64
+        hospitals_raw = await fetch_facilities(s, w, n, e, amenities=["hospital", "clinic", "health_post"])
+        emergency_raw = await fetch_facilities(s, w, n, e, amenities=["fire_station", "police", "ambulance_station"])
+        
+        hosp_nodes = _snap_to_graph(G, hospitals_raw)
+        emerg_nodes = _snap_to_graph(G, emergency_raw)
+        
+        hospitals_flooded = sum(1 for node in hosp_nodes if node in flooded_set)
+        emergency_flooded = sum(1 for node in emerg_nodes if node in flooded_set)
+        
+        # Real population data: query WorldPop raster for flooded area
+        pop_result = query_population_nodes(G, flooded)
+        population_affected = pop_result.get("population") or 0
+        pop_source = pop_result.get("source", "unknown")
+    else:
+        # Fast path for animation loops: skip heavy geospatial union/buffering/Overpass queries
+        hospitals_flooded = 0
+        emergency_flooded = 0
+        population_affected = 0
+        pop_source = "Skipped during animation"
 
     impact_metrics = {
         "population_affected": population_affected,
-        "population_source": pop_result.get("source", "unknown"),
+        "population_source": pop_source,
         "population_methodology": "WorldPop_2020_100m_gridded_estimate_bbox_aggregation",
         "hospitals_affected": hospitals_flooded,
         "emergency_stations_affected": emergency_flooded,

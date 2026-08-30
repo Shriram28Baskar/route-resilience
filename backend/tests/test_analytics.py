@@ -15,11 +15,10 @@ def test_estimate_population_impact():
     # With 4 nodes in baseline LCC, pop_per_node = 100 / 4 = 25
     # Perturbed LCC has 3 nodes (1, 2, 3). Node 4 is isolated.
     # Total isolated nodes = 1.
-    res = estimate_population_impact(G, G_pert, total_population=100)
+    res = estimate_population_impact(G, G_pert)
     
-    assert res["isolated_count"] == 1
-    assert res["total_affected"] == 25
-    assert res["percent_affected"] == 25.0
+    assert res["isolated_nodes"] == 1
+    assert res["lcc_fraction_retained"] == 0.75
 
 def test_run_progression_timeline():
     # Graph with 5 nodes

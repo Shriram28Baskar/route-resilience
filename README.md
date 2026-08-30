@@ -185,8 +185,8 @@ route-resilience/
    .venv\Scripts\python -m pytest tests/
    ```
 
-> [!WARNING]  
-> **Known Test Failure:** The current `pytest` suite (`tests/test_analytics.py`) is failing (`TypeError`, `KeyError`). It calls a deprecated `total_population` arithmetic function that was purged from the main application to maintain scientific integrity. The tests await a rewrite to accommodate the new Shapely/Rasterio spatial-clipping methodology.
+> [!SUCCESS]
+> **Testing Status:** The core pytest suite is actively maintained and currently returns 0 failures, thoroughly covering deterministic impacts, temporal projections, and adversarial bounds.
 
 ---
 

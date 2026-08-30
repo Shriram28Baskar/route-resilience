@@ -422,15 +422,16 @@ export interface FloodImpactMetrics {
   emergency_stations_affected: number;
 }
 
-export async function simulateFlood(waterLevel: number): Promise<{ 
+export async function simulateFlood(waterLevel: number, isAnimation: boolean = false): Promise<{ 
   ablated_nodes: string[]; 
   elevation_bounds: { min: number; max: number }; 
   water_level: number;
   impact_metrics: FloodImpactMetrics;
+  road_length_flooded_km?: number;
 }> {
   return request(`/simulate/flood`, {
     method: "POST",
-    body: JSON.stringify({ water_level: waterLevel }),
+    body: JSON.stringify({ water_level: waterLevel, is_animation: isAnimation }),
   });
 }
 
@@ -617,11 +618,20 @@ export async function getAccessibilityImpact(
 
 export async function chatWithCopilot(
   message: string,
-  history: { role: string; content: string }[] = [],
+  history: { role: "user" | "assistant"; content: string }[] = []
 ): Promise<CopilotResponse> {
   return request<CopilotResponse>(`/copilot/chat`, {
     method: "POST",
     body: JSON.stringify({ message, history }),
+  });
+}
+
+export async function generateBriefNarrative(
+  floodData: any, impactData: any, wardData: any
+): Promise<{ narrative: string }> {
+  return request<{ narrative: string }>(`/copilot/brief-narrative`, {
+    method: "POST",
+    body: JSON.stringify({ flood_data: floodData, impact_data: impactData, ward_data: wardData }),
   });
 }
 
@@ -1002,4 +1012,17 @@ export async function fetchTemporalProjection(
   const qs = params.toString();
   const url = `${BASE}/simulate/temporal-projection${qs ? `?${qs}` : ""}`;
   return request<TemporalProjectionResponse>(url);
+}
+export async function triggerWeatherAlert(thresholdMm: number = 15.6) {
+  return request(`/alerts/weather-trigger`, {
+    method: "POST",
+    body: JSON.stringify({ threshold_mm: thresholdMm, send_email: true, send_ws: true }),
+  });
+}
+
+export async function dispatchManualAlert(payload: any) {
+  return request(`/alerts/dispatch`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }

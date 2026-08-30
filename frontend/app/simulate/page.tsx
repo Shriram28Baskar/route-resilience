@@ -9,7 +9,7 @@ import {
   simulateFlood, getReliefCamps, getEquityMetrics, getTrafficImpact, getDegradationForecast,
   getGraphGeoJSON, compareAblation, prescribeAblation, getVulnerability,
   fetchFloodAccessibilityImpact, fetchWardReport, runRainfallBacktest, fetchCurrentWeather,
-  fetchHistoricalScenario,
+  fetchHistoricalScenario, connectAlertWebSocket, triggerWeatherAlert, type FloodAlert,
 } from "@/lib/api";
 import type {
   AblationResponse, CriticalityResponse, Recommendation, FragilityResponse,
@@ -23,6 +23,7 @@ import { resilienceColor, centralityColor, formatDistance, formatDuration } from
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, ReferenceLine, CartesianGrid, Legend } from "recharts";
 import { Waves, Tent } from "lucide-react";
 import { Users, Car, TrendingDown } from "lucide-react";
+import { IncidentBriefModal } from "@/components/IncidentBriefModal";
 import HistoricalScenarioResults from "@/components/HistoricalScenarioResults";
 
 
@@ -67,6 +68,8 @@ export default function SimulatePage() {
   const [alertSent, setAlertSent] = useState(false);
   const [historicalScenario, setHistoricalScenario] = useState<HistoricalScenarioResponse | null>(null);
   const [historicalLoading, setHistoricalLoading] = useState(false);
+  const [liveAlert, setLiveAlert] = useState<FloodAlert | null>(null);
+  const [showBrief, setShowBrief] = useState(false);
 
 
   // Ref to signal the async animation loop to stop when pause is hit
@@ -88,7 +91,7 @@ export default function SimulatePage() {
         setWaterLevel(level);
         setIsSyncing(true);
         try {
-          const res = await simulateFlood(level);
+          const res = await simulateFlood(level, true);
           setFlood(res);
           if (res.elevation_bounds) setElevationBounds(res.elevation_bounds);
         } catch (e: any) {
@@ -118,7 +121,7 @@ export default function SimulatePage() {
       }, 200);
       return () => clearTimeout(timeout);
     }
-  }, [waterLevel, tab]);
+  }, [waterLevel, tab, isPlayingFlood]);
 
   useEffect(() => {
     getCriticality(50).then(setCentrality).catch(console.error);
@@ -519,15 +522,24 @@ export default function SimulatePage() {
                   {historicalLoading
                     ? <span className="w-3 h-3 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
                     : <span>🗓</span>}
-                  {historicalLoading ? "Running 2022 scenario…" : "Load: 2022 Bengaluru Flood (Sept 5)"}
+                  {historicalLoading ? "Running 2022 scenario..." : "Load: 2022 Bengaluru Flood (Sept 5)"}
                 </button>
 
+                {(floodImpact || wardReport) && (
+                  <button
+                    onClick={() => setShowBrief(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#00E5B4]/10 border border-[#00E5B4]/30 text-[#00E5B4] font-bold rounded-xl hover:bg-[#00E5B4]/20 transition-colors text-xs mt-4 shadow-[0_0_15px_rgba(0,229,180,0.15)]"
+                  >
+                    <ShieldAlert className="w-4 h-4" />
+                    Generate Incident Commander Brief (P3)
+                  </button>
+                )}
               </div>
             )}
 
             {tab === "route" && (
               <div className="bg-[#111827] border border-white/8 rounded-xl p-5 space-y-4">
-                <h2 className="font-display font-semibold mb-1 text-sm uppercase tracking-widest text-[#6B7280]">Optimal Relief Camps</h2>
+                <h2 className="font-display font-semibold mb-1 text-sm uppercase tracking-widest text-[#6B7280]">Heuristically Optimized Relief Camps</h2>
                 <p className="text-xs text-[#6B7280]">K-Means clustering deploys camps into the densest surviving population centers. Drag the slider to change the number of camps.</p>
 
                 {/* Camp Count Slider */}
@@ -630,6 +642,15 @@ export default function SimulatePage() {
           </div>
         </div>
       </div>
+      
+      {showBrief && (
+        <IncidentBriefModal 
+          onClose={() => setShowBrief(false)} 
+          flood={flood} 
+          floodImpact={floodImpact} 
+          wardReport={wardReport} 
+        />
+      )}
     </div>
   );
 }
@@ -739,10 +760,11 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
                     )}
                   </div>
                   <div className="bg-[#0B0F1A] border border-white/8 rounded-lg p-4">
-                    <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1 flex items-center gap-1"><TrendingDown className="w-3 h-3"/> Damage Estimate</div>
+                    <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1 flex items-center gap-1"><TrendingDown className="w-3 h-3"/> Road Flooded</div>
                     <div className="font-mono text-2xl font-bold text-[#FF4444]">
-                      ${(flood.impact_metrics.cost_estimate_usd / 1000000).toFixed(1)}M
+                      {flood.road_length_flooded_km?.toFixed(1) || 0} km
                     </div>
+                    <div className="text-[9px] text-[#6B7280] mt-1">src: OSMnx Edge Data</div>
                   </div>
                   <div className="bg-[#0B0F1A] border border-white/8 rounded-lg p-4">
                     <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Hospitals at Risk</div>
@@ -785,7 +807,7 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
         {tab === "route" && relief && (
           <motion.div key="relief" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
             <div className="bg-[#111827] border border-[#00E5B4]/30 rounded-xl p-6">
-              <h3 className="font-display font-semibold text-lg text-[#00E5B4] flex items-center gap-2 mb-4"><Tent className="w-5 h-5"/> Optimal Relief Camps Deployed</h3>
+              <h3 className="font-display font-semibold text-lg text-[#00E5B4] flex items-center gap-2 mb-4"><Tent className="w-5 h-5"/> Heuristically Optimized Relief Camps</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {relief.camps.map((c: any, i: number) => {
                   const CAMP_COLORS = ["#00E5B4","#FFB400","#FF2D6B","#A855F7","#3B82F6","#F97316","#10B981","#EC4899","#14B8A6","#F59E0B"];
@@ -848,12 +870,12 @@ function AblationResults({ result, vulnerability }: { result: AblationResponse, 
   const riColor = resilienceColor(ri);
 
   const severity = result.disconnected
-    ? { label: "CRITICAL", sub: "(Network Partition Detected)", color: "#FF2D2D", bg: "rgba(255,45,45,0.12)", border: "rgba(255,45,45,0.3)", icon: "🔴" }
+    ? { label: "CRITICAL", sub: "Network Partitioned", color: "#FF2D2D", bg: "rgba(255,45,45,0.12)", border: "rgba(255,45,45,0.3)", icon: "🔴" }
     : ri === null || ri < 0.95
-    ? { label: "HIGH RISK", sub: "(Severe Routing Delays)", color: "#FF8C00", bg: "rgba(255,140,0,0.1)", border: "rgba(255,140,0,0.3)", icon: "🟠" }
+    ? { label: "HIGH RISK", sub: "Severe Routing Delays", color: "#FF8C00", bg: "rgba(255,140,0,0.1)", border: "rgba(255,140,0,0.3)", icon: "🟠" }
     : ri <= 0.98
-    ? { label: "DEGRADED", sub: "(Minor Rerouting Needed)", color: "#FFE600", bg: "rgba(255,230,0,0.1)", border: "rgba(255,230,0,0.3)", icon: "🟡" }
-    : { label: "HEALTHY", sub: "(Network Remains Fully Connected)", color: "#00E5B4", bg: "rgba(0,229,180,0.1)", border: "rgba(0,229,180,0.3)", icon: "🟢" };
+    ? { label: "DEGRADED", sub: "Minor Rerouting", color: "#FFE600", bg: "rgba(255,230,0,0.1)", border: "rgba(255,230,0,0.3)", icon: "🟡" }
+    : { label: "STABLE", sub: "Rerouting Successful", color: "#00E5B4", bg: "rgba(0,229,180,0.1)", border: "rgba(0,229,180,0.3)", icon: "🟢" };
   const baselineMin = result.baseline_avg_path_length ? (result.baseline_avg_path_length) / 60 : null;
   const perturbedMin = result.perturbed_avg_path_length ? (result.perturbed_avg_path_length) / 60 : null;
   const extraMin = (baselineMin && perturbedMin) ? (perturbedMin - baselineMin) : null;
@@ -878,6 +900,7 @@ function AblationResults({ result, vulnerability }: { result: AblationResponse, 
           </div>
           <div className="inline-flex flex-col gap-0.5 px-3 py-2 rounded-lg text-xs font-bold items-center"
             style={{ background: severity.bg, border: `1px solid ${severity.border}`, color: severity.color }}>
+            <div className="text-[8px] uppercase tracking-widest opacity-70 mb-0.5">Initial Impact</div>
             <div className="flex items-center gap-2 text-sm">{severity.icon} {severity.label}</div>
             {severity.sub && <div className="text-[9px] font-normal opacity-80">{severity.sub}</div>}
           </div>
@@ -886,15 +909,15 @@ function AblationResults({ result, vulnerability }: { result: AblationResponse, 
         {/* 3 Hero Metrics */}
         <div className="grid grid-cols-3 gap-3 mb-4">
           <div className="bg-[#0B0F1A] rounded-lg p-3 text-center">
-            <div className="text-[9px] text-[#6B7280] uppercase tracking-widest mb-1">Emergency Delay</div>
+            <div className="text-[9px] text-[#6B7280] uppercase tracking-widest mb-1">Ambulance Trip Delay</div>
             <div className="text-xl font-bold font-mono" style={{ color: extraMin && extraMin > 0 ? "#FF4444" : "#00E5B4" }}>
               {extraMin !== null ? `+${extraMin.toFixed(1)} min` : "—"}
             </div>
           </div>
           <div className="bg-[#0B0F1A] rounded-lg p-3 text-center">
-            <div className="text-[9px] text-[#6B7280] uppercase tracking-widest mb-1">Delivery Slowdown</div>
+            <div className="text-[9px] text-[#6B7280] uppercase tracking-widest mb-1">Ambulance Trip Delay (%)</div>
             <div className="text-xl font-bold font-mono" style={{ color: pctSlower && parseFloat(pctSlower) > 0 ? "#FF8C00" : "#00E5B4" }}>
-              {pctSlower !== null ? `${pctSlower}%` : "—"}
+              {pctSlower !== null ? `+${pctSlower}%` : "—"}
             </div>
           </div>
           <div className="bg-[#0B0F1A] rounded-lg p-3 text-center">
@@ -929,6 +952,7 @@ function AblationResults({ result, vulnerability }: { result: AblationResponse, 
         {/* Baseline Context footer */}
         {vulnerability && (
           <div className="border-t border-white/8 pt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-[#9CA3AF]">
+            <span className="font-bold text-white uppercase tracking-widest mr-2">Pre-Attack Baseline:</span>
             <span>Risk Level: <span className="text-[#FF4444] font-bold">{vulnerability.fragility_summary.risk_level}</span></span>
             <span><span className="text-white font-bold">{vulnerability.fragility_summary.single_points_of_failure}</span> single points of failure (~{Math.round((vulnerability.fragility_summary.single_points_of_failure / result.baseline_metrics.num_nodes) * 100)}% of network)</span>
           </div>
@@ -1010,50 +1034,50 @@ function CascadeResults({ result, totalNodes }: { result: { seed_nodes?: string[
                 <strong className="text-white">
                   {steps.reduce((acc: number, s: any) => acc + (s.newly_stressed?.length || 0), 0)} additional intersections
                 </strong>{" "}
-                are currently at &gt;85% stress capacity and at risk of secondary failure.
+                are experiencing NEW stress from rerouted traffic.
               </div>
             </div>
           )}
         </div>
 
-        {/* Section 2 — Real-World Impact */}
+        {/* Section 2 — Real-World Impact (Structural) */}
         <div className="border-t border-white/8 pt-4 mb-5">
-          <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-3">Real-World Impact</div>
+          <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-3">Structural Cascade Impact</div>
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div className="flex items-center gap-2">
-              <span className="text-base shrink-0">👥</span>
+              <span className="text-base shrink-0">💥</span>
               <div>
-                <div className="text-[9px] text-[#6B7280]">Residents Cut Off</div>
-                <div className="text-white font-bold font-mono">{(totalFailed * 1008).toLocaleString()}</div>
+                <div className="text-[9px] text-[#6B7280]">Structurally Failed</div>
+                <div className="text-white font-bold font-mono">{totalFailed} nodes</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-base shrink-0">🏥</span>
+              <span className="text-base shrink-0">🚧</span>
               <div>
-                <div className="text-[9px] text-[#6B7280]">Hospitals Isolated</div>
-                <div className="text-[#FF4444] font-bold font-mono">{Math.max(1, Math.floor((totalNodes - finalLcc) * 0.005))}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-base shrink-0">🚑</span>
-              <div>
-                <div className="text-[9px] text-[#6B7280]">Emergency Degradation</div>
-                <div className="text-[#FF4444] font-bold font-mono">+{(cascadeMultiplier * 7.5).toFixed(1)}%</div>
+                <div className="text-[9px] text-[#6B7280]">Isolated Intersections</div>
+                <div className="text-[#FF4444] font-bold font-mono">{Math.max(0, totalNodes - totalFailed - finalLcc)}</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-base shrink-0">🔗</span>
               <div>
-                <div className="text-[9px] text-[#6B7280]">Network Status</div>
-                <div className="font-bold font-mono" style={{ color: statusColor }}>{finalComponents === 1 ? "Connected" : `${finalComponents} Components`}</div>
+                <div className="text-[9px] text-[#6B7280]">Network Partitions</div>
+                <div className="font-bold font-mono" style={{ color: statusColor }}>{finalComponents === 1 ? "None (Intact)" : `${finalComponents} Components`}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-base shrink-0">🟢</span>
+              <div>
+                <div className="text-[9px] text-[#6B7280]">Largest Functional Core</div>
+                <div className="text-[#00E5B4] font-bold font-mono">{((finalLcc / totalNodes) * 100).toFixed(1)}%</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Final status badge */}
-        <div className="text-center py-2 rounded-lg text-sm font-bold" style={{ background: `${statusColor}18`, border: `1px solid ${statusColor}40`, color: statusColor }}>
-          Final Network Status: {statusIcon} {statusLabel}
+        <div className="text-center py-2 rounded-lg text-sm font-bold uppercase tracking-wide" style={{ background: `${statusColor}18`, border: `1px solid ${statusColor}40`, color: statusColor }}>
+          Secondary Cascade Status: {statusIcon} {statusLabel}
         </div>
       </div>
 
@@ -1082,6 +1106,40 @@ function CascadeResults({ result, totalNodes }: { result: { seed_nodes?: string[
           </div>
         </div>
       )}
+
+      {/* ── Forensic Cascade Logs (Collapsed) ───────────────────────── */}
+      <details className="mt-4 border border-white/10 rounded-lg bg-[#0B0F1A] text-xs">
+        <summary className="cursor-pointer p-3 text-[#6B7280] font-bold tracking-wider uppercase hover:text-white transition-colors outline-none">
+          ▶ View Forensic Cascade Logs
+        </summary>
+        <div className="p-3 border-t border-white/10 space-y-3">
+          {steps.map((s: any, idx: number) => (
+            <div key={idx} className="bg-[#111827] rounded p-3">
+              <div className="text-[#00E5B4] font-mono mb-2">
+                Iteration {s.iteration} <span className="text-[#6B7280] text-[10px] ml-1 uppercase">{s.iteration === 0 ? "(Initial Attack)" : "(Cascade Step)"}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[#9CA3AF]">
+                <div>
+                  <span className="block text-[9px] uppercase">Failed Nodes</span>
+                  <span className="text-white font-mono">{s.ablated.length}</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] uppercase">Newly Stressed</span>
+                  <span className="text-white font-mono">{s.newly_stressed?.length || 0}</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] uppercase">Connected Core</span>
+                  <span className="text-white font-mono">{s.lcc_size} nodes</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] uppercase">Components</span>
+                  <span className="text-white font-mono">{s.component_count}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
 
     </div>
   );

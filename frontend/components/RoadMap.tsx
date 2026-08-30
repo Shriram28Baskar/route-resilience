@@ -79,15 +79,15 @@ export default function RoadMap({
   const [theme, setTheme] = useState<"dark" | "light" | "satellite" | "bhuvan">("dark");
 
   const tileUrls = {
-    dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    light: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    dark: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+    light: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
     satellite: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     bhuvan: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
   };
 
   const attributions = {
-    dark: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-    light: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    dark: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+    light: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
     satellite: 'Tiles &copy; Esri &mdash; World Imagery',
     bhuvan: 'Esri World Topo Map | ISRO NNRMS Terrain Analysis &copy; <a href="https://bhuvan.nrsc.gov.in">NRSC/ISRO</a>'
   };
@@ -103,7 +103,7 @@ export default function RoadMap({
       return { color: "#F59E0B", weight: 2, opacity: 0.8 };        // MEDIUM – amber
     if (["tertiary", "tertiary_link"].includes(hw))
       return { color: "#06B6D4", weight: 1.5, opacity: 0.7 };      // LOW – cyan
-    return { color: "#6366F1", weight: 1, opacity: 0.45 };         // LOCAL – indigo
+    return { color: "#A855F7", weight: 1, opacity: 0.45 };         // LOCAL – purple
   };
 
   const roadLines = graphGeojson
@@ -125,9 +125,16 @@ export default function RoadMap({
         
         <TileLayer
           key={theme}
-          url={tileUrls[theme]}
-          attribution={attributions[theme]}
-          maxZoom={19}
+          url={
+            theme === "satellite" || theme === "bhuvan" 
+              ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              : theme === "dark"
+                ? "https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
+                : "https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png"
+          }
+          attribution={theme === "satellite" || theme === "bhuvan" ? attributions[theme] : '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; OpenStreetMap'}
+          maxZoom={20}
+          className=""
         />
 
         {/* Standard Modes: Dark / Light / Satellite — with optional catchment zone coloring */}
@@ -148,7 +155,7 @@ export default function RoadMap({
               }
               return {
                 color: theme === "dark"
-                  ? "rgba(99, 102, 241, 0.55)"   // indigo glow on dark
+                  ? "rgba(168, 85, 247, 0.55)"   // purple glow on dark
                   : theme === "light"
                   ? "rgba(30, 41, 59, 0.25)"     // slate on light
                   : "rgba(148, 163, 184, 0.45)", // muted slate on satellite
@@ -226,7 +233,7 @@ export default function RoadMap({
 
       {/* Floating Theme Switcher */}
       <div style={{ position: "absolute", top: "12px", right: "12px", zIndex: 1000 }} className="bg-[#111827]/90 border border-white/10 rounded-md p-1 flex gap-1 shadow-lg backdrop-blur-sm">
-        {(["dark", "light", "satellite"] as const).map((t) => (
+        {(["dark", "light"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTheme(t)}
@@ -594,17 +601,17 @@ function RouteLayer({ routeResult, activeRoute }: { routeResult: any, activeRout
       )}
       {activeGeojson && (
         <>
-          {/* Thick black outline for maximum contrast against any basemap */}
+          {/* Soft dark drop-shadow/outline for separation */}
           <GeoJSON
             key={`active-route-bg-${activeRoute}`}
             data={activeGeojson}
-            style={{ color: "#000000", weight: 11, opacity: 0.9 }}
+            style={{ color: "#000000", weight: 10, opacity: 0.7 }}
           />
-          {/* Bright white dashes — universally readable on dark maps */}
+          {/* Solid bright white core — clean and universally readable */}
           <GeoJSON
             key={`active-route-fg-${activeRoute}`}
             data={activeGeojson}
-            style={{ color: "#FFFFFF", weight: 5, opacity: 1.0, dashArray: "10, 8" }}
+            style={{ color: "#FFFFFF", weight: 4, opacity: 1.0 }}
           />
         </>
       )}
@@ -613,11 +620,21 @@ function RouteLayer({ routeResult, activeRoute }: { routeResult: any, activeRout
 }
 
 function FloodLayer({ floodNodes, graphGeojson }: { floodNodes: string[], graphGeojson: GeoJSON.FeatureCollection }) {
-  const nodes = floodNodes.map(id => {
-    const f = graphGeojson.features.find(f => f.properties?.id === id);
-    if (!f || f.geometry.type !== "Point") return null;
-    return { id, lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
-  }).filter(Boolean) as { id: string, lat: number, lon: number }[];
+  // Performance Fix: Convert to O(N) lookup instead of O(N*M) which was causing massive browser lag
+  const floodSet = new Set(floodNodes);
+  const nodes: { id: string, lat: number, lon: number }[] = [];
+  
+  if (graphGeojson?.features) {
+    for (const f of graphGeojson.features) {
+      if (f.geometry.type === "Point" && f.properties?.id && floodSet.has(f.properties.id)) {
+        nodes.push({ 
+          id: f.properties.id, 
+          lat: f.geometry.coordinates[1], 
+          lon: f.geometry.coordinates[0] 
+        });
+      }
+    }
+  }
 
   return (
     <>

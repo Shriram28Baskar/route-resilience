@@ -31,17 +31,16 @@ class ChatMessage(BaseModel):
 class CopilotRequest(BaseModel):
     message: str
     history: Optional[list[ChatMessage]] = []
-    context_override: Optional[Dict[str, Any]] = None   # allow frontend to pass custom context
 
 
 @router.post("/chat")
 async def copilot_chat(req: CopilotRequest):
     """
     Accept a user question and return a grounded answer from the LLM.
-    Context is assembled server-side from the current GraphStore state.
+    Context is assembled EXCLUSIVELY server-side from the current GraphStore state.
     """
-    # Build graph context
-    context = _build_context(req.context_override)
+    # Build graph context (purely server-side)
+    context = _build_context()
 
     # Build conversation messages
     messages = [
@@ -64,12 +63,12 @@ async def copilot_chat(req: CopilotRequest):
     })
 
 
-def _build_context(override: Optional[Dict] = None) -> Dict:
-    """Assemble a structured context for Copilot without giant arrays or expensive recomputations."""
-    if override:
-        return override
-
-    G = GraphStore.get_healed() or GraphStore.get_osm_fallback()
+def _build_context() -> Dict:
+    """Assemble a structured context for Copilot exclusively from server state."""
+    G_healed = GraphStore.get_healed()
+    G_fallback = GraphStore.get_osm_fallback()
+    
+    G = G_healed or G_fallback
     if G is None:
         return {"status": "no_graph_loaded"}
 
@@ -79,6 +78,7 @@ def _build_context(override: Optional[Dict] = None) -> Dict:
     # Base topology summary
     ctx = {
         "graph_loaded": True,
+        "graph_state": "BASELINE_FALLBACK" if G_healed is None else "ACTIVE_INCIDENT_SIMULATION",
         "metrics": {
             "num_nodes": metrics.get("num_nodes"),
             "num_edges": metrics.get("num_edges"),
@@ -118,4 +118,42 @@ def _build_context(override: Optional[Dict] = None) -> Dict:
         ctx["limitations"] = sim.get("model_limitations")
 
     return ctx
+
+class BriefRequest(BaseModel):
+    flood_data: Dict[str, Any]
+    impact_data: Dict[str, Any]
+    ward_data: Dict[str, Any]
+
+BRIEF_SYSTEM_PROMPT = """You are an AI assistant generating an 'Incident Commander Narrative' for a disaster response brief.
+You will be provided with VERIFIED STRUCTURED DATA from a topographical flood simulation and its cascading impacts on road networks and emergency facilities.
+
+YOUR TASK:
+Write a 1-2 paragraph executive summary narrative of the situation. 
+
+CRITICAL RULES:
+1. ONLY use the numbers and facts provided in the JSON data.
+2. NEVER invent, hallucinate, or calculate new numbers (e.g. do not guess financial losses, deaths, or percentages).
+3. Do not include recommendations or formatting like Markdown headers—just plain text narrative.
+4. Keep it concise, urgent but professional, suitable for an Incident Commander.
+5. If the data is empty or missing, explicitly state "Insufficient data to generate operational narrative."
+"""
+
+@router.post("/brief-narrative")
+async def generate_brief_narrative(req: BriefRequest):
+    """
+    Generate a short AI narrative from structured brief data.
+    """
+    context_msg = f"""[STRUCTURED VERIFIED DATA]
+Flood Data: {json.dumps(req.flood_data)}
+Impact Data: {json.dumps(req.impact_data)}
+Ward Data: {json.dumps(req.ward_data)}
+"""
+    try:
+        reply = await groq_chat(system=BRIEF_SYSTEM_PROMPT, messages=[{"role": "user", "content": context_msg}])
+    except Exception as exc:
+        logger.error(f"Groq narrative failed: {exc}")
+        # Graceful degradation: return a fallback deterministic string
+        reply = "AI narrative generation unavailable. Please refer to the structured data below."
+
+    return JSONResponse({"narrative": reply})
 

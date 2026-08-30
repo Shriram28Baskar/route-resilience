@@ -61,7 +61,7 @@ def run_progression_timeline(
         density_ratio = min(1.0, density / baseline_density)
         
         # Simple heuristic for GRS: weighted combination of connectivity and population isolation
-        isolated_frac = pop_impact["percent_affected"] / 100.0
+        isolated_frac = 1.0 - pop_impact.get("lcc_fraction_retained", 1.0)
         grs = (0.7 * lcc_fraction) + (0.3 * (1.0 - isolated_frac))
         
         timeline.append({
@@ -69,7 +69,7 @@ def run_progression_timeline(
             "phase": phase,
             "active_ablated_count": ablated_count,
             "global_resilience_score": round(grs, 4),
-            "isolated_population": pop_impact["total_affected"],
+            "isolated_population": pop_impact.get("isolated_nodes", 0),
             "lcc_fraction": round(lcc_fraction, 4),
             "affected_nodes": new_nodes or [],
             "metrics": metrics
