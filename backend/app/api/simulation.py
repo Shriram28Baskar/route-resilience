@@ -34,6 +34,12 @@ from app.simulation.temporal_degradation import run_degradation_forecast
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# ── Module-level result caches (populated at startup by warmup thread) ────────
+# Recommendations and predefined scenarios are computed from a static OSM graph
+# and never change between requests — serving from cache makes them instant.
+_RECOMMENDATIONS_CACHE: dict = {}   # {"data": List[Recommendation]}
+_SCENARIO_CACHE: dict = {}          # {"predefined": List[ScenarioResult]}
+
 
 class AblateRequest(BaseModel):
     node_ids: List[str]
@@ -753,12 +759,34 @@ def route(req: RouteRequest):
 def scenarios(req: MultiScenarioRequest):
     """
     Run multiple scenarios and return comparative metrics.
+    Predefined scenarios (Baseline/Minor Incident/Major Flood/Targeted Attack) are served
+    from startup cache instantly. Only user-custom scenarios are computed on-demand.
     """
     G = GraphStore.get_healed() or GraphStore.get_osm_fallback()
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
-        
-    results = run_multi_scenario(G, [s.dict() for s in req.scenarios])
+
+    predefined_names = {"Baseline", "Minor Incident", "Major Flood", "Targeted Attack"}
+    cached = _SCENARIO_CACHE.get("predefined", [])
+    cached_names = {s["name"] for s in cached}
+
+    # Separate incoming scenarios into cached vs custom
+    custom_scenarios = [s.dict() for s in req.scenarios if s.name not in predefined_names]
+
+    # For predefined scenarios requested by the caller, return from cache
+    predefined_requested = [s.dict() for s in req.scenarios if s.name in predefined_names]
+    from_cache = [s for s in cached if s["name"] in {p["name"] for p in predefined_requested}]
+
+    # Only compute the custom ones live (e.g. "Active Custom Disaster")
+    custom_results = run_multi_scenario(G, custom_scenarios) if custom_scenarios else []
+
+    # Merge: cached results in original order + custom appended
+    results = from_cache + custom_results
+
+    # Fall back to full live computation if cache not populated yet
+    if not from_cache and not custom_results:
+        results = run_multi_scenario(G, [s.dict() for s in req.scenarios])
+
     return JSONResponse({"scenarios": results})
 
 
@@ -800,13 +828,18 @@ def get_fragility():
 def get_recommendations():
     """
     Returns infrastructure upgrade and bypass recommendations based on resilience gain.
+    Served from startup cache (instant). Falls back to live computation if cache not ready.
     """
+    if "data" in _RECOMMENDATIONS_CACHE:
+        return JSONResponse({"recommendations": _RECOMMENDATIONS_CACHE["data"], "cached": True})
+
     G = GraphStore.get_healed() or GraphStore.get_osm_fallback()
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
 
     recs = generate_recommendations(G)
-    return JSONResponse({"recommendations": recs})
+    _RECOMMENDATIONS_CACHE["data"] = recs   # populate cache for next time
+    return JSONResponse({"recommendations": recs, "cached": False})
 
 class SimulateInvestmentRequest(BaseModel):
     recommendation_idx: int

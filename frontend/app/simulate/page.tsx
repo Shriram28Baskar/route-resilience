@@ -39,6 +39,7 @@ export default function SimulatePage() {
   const [cascade, setCascade] = useState<any | null>(null);
   const [route, setRoute] = useState<any | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[] | null>(null);
+  const [prescriptions, setPrescriptions] = useState<any[] | null>(null);
   const [investmentSim, setInvestmentSim] = useState<any | null>(null);
   const [fragility, setFragility] = useState<FragilityResponse | null>(null);
   const [scenarios, setScenarios] = useState<MultiScenarioResponse | null>(null);
@@ -90,10 +91,14 @@ export default function SimulatePage() {
         level += 1;
         setWaterLevel(level);
         setIsSyncing(true);
+        const thisId = ++floodRequestId.current;
         try {
           const res = await simulateFlood(level, true);
-          setFlood(res);
-          if (res.elevation_bounds) setElevationBounds(res.elevation_bounds);
+          // Only apply if animation is still running and this is the latest request
+          if (floodAnimRef.current && thisId === floodRequestId.current) {
+            setFlood(res);
+            if (res.elevation_bounds) setElevationBounds(res.elevation_bounds);
+          }
         } catch (e: any) {
           setError(e.message);
           floodAnimRef.current = false;
@@ -214,20 +219,36 @@ export default function SimulatePage() {
           ablated_node_ids: Array.from(new Set(customAblated))
         });
       }
-      const res = await runScenarios(predefinedScenarios);
+      const [res, recRes, prescribeRes] = await Promise.all([
+        runScenarios(predefinedScenarios),
+        getRecommendations(),
+        customAblated.length > 0 ? prescribeAblation(Array.from(new Set(customAblated))) : Promise.resolve(null),
+      ]);
       setScenarios(res);
-      const recRes = await getRecommendations();
       setRecommendations(recRes.recommendations);
+      if (prescribeRes) {
+        setPrescriptions(prescribeRes.suggestions);
+      } else {
+        setPrescriptions(null);
+      }
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   };
 
+  const floodRequestId = useRef(0);
+
   const handleFlood = async (silent = false) => {
+    // Snapshot the level NOW — by the time the API responds, waterLevel state may have changed
+    const level = waterLevel;
+    const thisId = ++floodRequestId.current;
+
     if (!silent) setLoading(true);
     else setIsSyncing(true);
     setError(null);
     try {
-      const res = await simulateFlood(waterLevel);
+      const res = await simulateFlood(level);
+      // Discard response if a newer request has already been fired
+      if (thisId !== floodRequestId.current) return;
       setFlood(res);
       if (res.elevation_bounds) {
         setElevationBounds(res.elevation_bounds);
@@ -620,6 +641,7 @@ export default function SimulatePage() {
               selectedNodes={selectedNodes}
               onMapClick={handleMapClick}
               recommendations={recommendations}
+              prescriptions={prescriptions}
               investmentSim={investmentSim}
               fragility={fragility}
               scenarios={scenarios}
@@ -638,6 +660,7 @@ export default function SimulatePage() {
               weather={weather}
               handleWeather={handleWeather}
               historicalScenario={historicalScenario}
+              waterLevel={waterLevel}
             />
           </div>
         </div>
@@ -661,7 +684,7 @@ import dynamic from "next/dynamic";
 
 const RoadMap = dynamic(() => import("@/components/RoadMap"), { ssr: false });
 
-function SimulateResults({ tab, result, ablation, cascade, route, centrality, graphGeojson, srcNode, tgtNode, selectedNodes, onMapClick, recommendations, investmentSim, fragility, scenarios, flood, relief, equityMetrics, trafficImpact, degradation, handleSimulateInvestment, loading, vulnerability, isSyncing, floodImpact, wardReport, backtest, weather, handleWeather, historicalScenario }: any) {
+function SimulateResults({ tab, result, ablation, cascade, route, centrality, graphGeojson, srcNode, tgtNode, selectedNodes, onMapClick, recommendations, prescriptions, investmentSim, fragility, scenarios, flood, relief, equityMetrics, trafficImpact, degradation, handleSimulateInvestment, loading, vulnerability, isSyncing, floodImpact, wardReport, backtest, weather, handleWeather, historicalScenario, waterLevel }: any) {
   const [activeRoute, setActiveRoute] = useState<string>("optimal");
 
   return (
@@ -717,7 +740,7 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
         )}
         {tab === "scenarios" && recommendations && (
           <motion.div key="recommend" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <RecommendationsResults recommendations={recommendations} investmentSim={investmentSim} onSimulate={handleSimulateInvestment} loading={loading} />
+            <RecommendationsResults recommendations={recommendations} prescriptions={prescriptions} investmentSim={investmentSim} onSimulate={handleSimulateInvestment} loading={loading} />
           </motion.div>
         )}
         {tab === "fragility" && fragility && (
@@ -742,7 +765,7 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
                 </div>
               )}
               <h3 className="font-display font-semibold text-lg text-[#0099FF] flex items-center gap-2 mb-2"><Waves className="w-5 h-5"/> Flood Simulation Active</h3>
-              <p className="text-sm text-[#6B7280]">Water level: <span className="text-white font-mono">{flood.water_level}m</span>. <span className="text-[#FF4444] font-bold">{flood.ablated_nodes.length}</span> nodes flooded.</p>
+              <p className="text-sm text-[#6B7280]">Water level: <span className="text-white font-mono">{waterLevel}m</span>. <span className="text-[#FF4444] font-bold">{flood.ablated_nodes.length}</span> nodes flooded.</p>
               
               {flood.impact_metrics && (
                 <div className="mt-5 grid grid-cols-2 gap-4">
@@ -1453,9 +1476,9 @@ function RouteCard({ title, route, color }: { title: string; route: any; color: 
 
 import { Shield, Waypoints } from "lucide-react";
 
-function RecommendationsResults({ recommendations, investmentSim, onSimulate, loading }: { recommendations: Recommendation[], investmentSim: any, onSimulate: (idx: number) => void, loading: boolean }) {
+function RecommendationsResults({ recommendations, prescriptions, investmentSim, onSimulate, loading }: { recommendations: Recommendation[], prescriptions: any[] | null, investmentSim: any, onSimulate: (idx: number) => void, loading: boolean }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {investmentSim && (
         <div className="bg-[#111827] border border-[#00E5B4]/30 rounded-xl p-6">
           <h3 className="font-display font-semibold text-sm mb-4">Investment Simulation Results</h3>
@@ -1476,40 +1499,84 @@ function RecommendationsResults({ recommendations, investmentSim, onSimulate, lo
         </div>
       )}
 
-      {recommendations.map((rec, idx) => (
-        <div key={idx} className="bg-[#111827] border border-white/8 rounded-xl p-5 flex flex-col gap-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${rec.type === 'bypass' ? 'bg-[#FFB400]/10' : 'bg-[#00E5B4]/10'}`}>
-                {rec.type === 'bypass' ? <Waypoints className="w-5 h-5 text-[#FFB400]" /> : <Shield className="w-5 h-5 text-[#00E5B4]" />}
-              </div>
-              <div>
-                <h3 className="font-display font-semibold text-sm">{rec.title}</h3>
-                <p className="text-xs text-[#6B7280] mt-1">{rec.description}</p>
-              </div>
-            </div>
+      {/* TACTICAL DISASTER RESPONSE */}
+      {prescriptions && prescriptions.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="font-display font-bold text-white text-sm">Tactical Disaster Response</h2>
+            <p className="text-xs text-[#6B7280]">Short-term mitigation strategies dynamically calculated for the currently active disaster scenario.</p>
           </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-[#0B0F1A] border border-white/8 rounded-lg p-3">
-              <div className="text-[10px] text-[#6B7280] uppercase tracking-wider mb-1">Est. Cost</div>
-              <div className="font-mono text-sm">{rec.cost_estimate}</div>
+          {prescriptions.map((rec, idx) => (
+            <div key={`presc-${idx}`} className="bg-[#111827] border border-[#FF4444]/20 rounded-xl p-5 flex flex-col gap-4 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-[#FF4444]" />
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-[#FF4444]/10`}>
+                    <Shield className="w-5 h-5 text-[#FF4444]" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-semibold text-sm">{rec.priority}: {rec.rationale}</h3>
+                    <p className="text-xs text-[#6B7280] mt-1">Temporary measure to reduce isolated population by <span className="text-[#FF4444] font-mono">{rec.isolated_nodes.toLocaleString()}</span> nodes.</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-[#0B0F1A] border border-white/8 rounded-lg p-3">
+                  <div className="text-[10px] text-[#6B7280] uppercase tracking-wider mb-1">Est. Effort</div>
+                  <div className="font-mono text-sm">{rec.cost_estimate}</div>
+                </div>
+                <div className="bg-[#0B0F1A] border border-white/8 rounded-lg p-3">
+                  <div className="text-[10px] text-[#6B7280] uppercase tracking-wider mb-1">Tactical Gain Score</div>
+                  <div className="font-mono text-sm text-[#FF4444]">+{rec.estimated_resilience_gain.toFixed(3)}</div>
+                </div>
+              </div>
             </div>
-            <div className="bg-[#0B0F1A] border border-white/8 rounded-lg p-3">
-              <div className="text-[10px] text-[#6B7280] uppercase tracking-wider mb-1">Resilience Gain Score</div>
-              <div className="font-mono text-sm text-[#00E5B4]">+{rec.rgs.toFixed(3)}</div>
-            </div>
-          </div>
-          
-          <button 
-            onClick={() => onSimulate(idx)}
-            disabled={loading}
-            className="w-full py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-medium transition-colors border border-white/8"
-          >
-            Simulate Investment
-          </button>
+          ))}
         </div>
-      ))}
+      )}
+
+      {/* LONG-TERM STRATEGIC PLANNING */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="font-display font-bold text-white text-sm">Long-Term Infrastructure Planning</h2>
+          <p className="text-xs text-[#6B7280]">Strategic upgrades calculated against the baseline city network to resolve permanent structural bottlenecks.</p>
+        </div>
+        {recommendations.map((rec, idx) => (
+          <div key={`rec-${idx}`} className="bg-[#111827] border border-white/8 rounded-xl p-5 flex flex-col gap-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${rec.type === 'bypass' ? 'bg-[#FFB400]/10' : 'bg-[#00E5B4]/10'}`}>
+                  {rec.type === 'bypass' ? <Waypoints className="w-5 h-5 text-[#FFB400]" /> : <Shield className="w-5 h-5 text-[#00E5B4]" />}
+                </div>
+                <div>
+                  <h3 className="font-display font-semibold text-sm">{rec.title}</h3>
+                  <p className="text-xs text-[#6B7280] mt-1">{rec.description}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-[#0B0F1A] border border-white/8 rounded-lg p-3">
+                <div className="text-[10px] text-[#6B7280] uppercase tracking-wider mb-1">Est. Cost</div>
+                <div className="font-mono text-sm">{rec.cost_estimate}</div>
+              </div>
+              <div className="bg-[#0B0F1A] border border-white/8 rounded-lg p-3">
+                <div className="text-[10px] text-[#6B7280] uppercase tracking-wider mb-1">Resilience Gain Score</div>
+                <div className="font-mono text-sm text-[#00E5B4]">+{rec.rgs.toFixed(3)}</div>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => onSimulate(idx)}
+              disabled={loading}
+              className="w-full py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-medium transition-colors border border-white/8"
+            >
+              Simulate Investment
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

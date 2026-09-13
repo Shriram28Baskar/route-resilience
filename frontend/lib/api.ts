@@ -3,7 +3,14 @@
  * All functions throw on non-2xx responses with descriptive errors.
  */
 
-const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+const BASE = "/api";
+// Long-running requests bypass the Next.js proxy (which has a ~30s timeout)
+// and call the backend directly from the browser.
+const DIRECT_BASE = typeof window !== "undefined" 
+  ? (window.location.hostname === "localhost" 
+      ? `${window.location.protocol}//127.0.0.1:8000` 
+      : `${window.location.protocol}//${window.location.hostname}:8000`)
+  : "http://127.0.0.1:8000";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -264,10 +271,16 @@ export async function explainTile(file: File): Promise<{ overlay_b64: string; me
 // ── Simulation API ─────────────────────────────────────────────────────────
 
 export async function ablateNodes(nodeIds: string[], autoTopN = 0): Promise<AblationResponse> {
-  return request<AblationResponse>(`/simulate/ablate`, {
+  const res = await fetch(`${DIRECT_BASE}/simulate/ablate`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ node_ids: nodeIds, auto_top_n: autoTopN }),
   });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`API ${res.status}: ${detail}`);
+  }
+  return res.json();
 }
 
 export interface AblateStrategyResult {
@@ -358,10 +371,16 @@ export async function getVulnerability(topN = 20): Promise<VulnerabilityResponse
 }
 
 export async function runCascade(nodeIds: string[], maxIterations = 3, threshold = 0.7): Promise<{ cascade_steps: CascadeStep[] }> {
-  return request(`/simulate/cascade`, {
+  const res = await fetch(`${DIRECT_BASE}/simulate/cascade`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ node_ids: nodeIds, max_iterations: maxIterations, threshold }),
   });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`API ${res.status}: ${detail}`);
+  }
+  return res.json();
 }
 
 export async function computeRoute(
@@ -681,10 +700,16 @@ export async function runRainfallBacktest(
   min_rainfall_mm = 0,
   max_events = 50
 ): Promise<BacktestResponse> {
-  return request<BacktestResponse>(`/simulate/rainfall-backtest`, {
+  const res = await fetch(`${DIRECT_BASE}/simulate/rainfall-backtest`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ min_rainfall_mm, max_events }),
   });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`API ${res.status}: ${detail}`);
+  }
+  return res.json();
 }
 
 // ── Step 8: Ward Report ────────────────────────────────────────────────────
@@ -712,10 +737,16 @@ export interface WardReportResponse {
 }
 
 export async function fetchWardReport(ablated_node_ids: string[]): Promise<WardReportResponse> {
-  return request<WardReportResponse>(`/accessibility/ward-report`, {
+  const res = await fetch(`${DIRECT_BASE}/accessibility/ward-report`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ablated_node_ids }),
   });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`API ${res.status}: ${detail}`);
+  }
+  return res.json();
 }
 
 // ── Steps 4+5+6: Flood Accessibility Impact ────────────────────────────────
@@ -753,10 +784,16 @@ export interface FloodAccessibilityResponse {
 export async function fetchFloodAccessibilityImpact(
   ablated_node_ids: string[]
 ): Promise<FloodAccessibilityResponse> {
-  return request<FloodAccessibilityResponse>(`/accessibility/flood-impact`, {
+  const res = await fetch(`${DIRECT_BASE}/accessibility/flood-impact`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ablated_node_ids }),
   });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`API ${res.status}: ${detail}`);
+  }
+  return res.json();
 }
 
 // ── Step 9: Live Weather ───────────────────────────────────────────────────
@@ -931,9 +968,14 @@ export async function fetchHistoricalScenario(
   overrideWaterLevelM?: number
 ): Promise<HistoricalScenarioResponse> {
   const url = overrideWaterLevelM != null
-    ? `/simulate/historical/${scenarioId}?override_water_level_m=${overrideWaterLevelM}`
-    : `/simulate/historical/${scenarioId}`;
-  return request<HistoricalScenarioResponse>(url);
+    ? `${DIRECT_BASE}/simulate/historical/${scenarioId}?override_water_level_m=${overrideWaterLevelM}`
+    : `${DIRECT_BASE}/simulate/historical/${scenarioId}`;
+  const res = await fetch(url, { headers: { "Content-Type": "application/json" } });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`API ${res.status}: ${detail}`);
+  }
+  return res.json();
 }
 
 // ── Temporal Flood Projection ─────────────────────────────────────────────────

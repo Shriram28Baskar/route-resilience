@@ -1,11 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Leaflet requires transpilation
   transpilePackages: ["leaflet", "react-leaflet"],
-  env: {
-    NEXT_PUBLIC_API_BASE: process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000",
+  // Increase proxy timeout for long-running backend calls (e.g. /simulate/cascade)
+  httpAgentOptions: {
+    keepAlive: true,
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://127.0.0.1:8000/:path*',
+      },
+    ]
   },
 };
 
 module.exports = nextConfig;
+

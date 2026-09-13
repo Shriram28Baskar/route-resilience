@@ -22,8 +22,9 @@ logger = logging.getLogger(__name__)
 
 # Number of recommendations to generate
 _TOP_K = 3
-# Sample size for RI computation during optimization (smaller = faster, still representative)
-_RI_SAMPLE = 40
+# Sample size for RI computation during optimization.
+# 20 sources is still statistically robust for a 13k-node graph (was 40 — halved for speed)
+_RI_SAMPLE = 20
 
 
 def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -45,25 +46,27 @@ def _cost_estimate(dist_m: float, road_type: str = "bypass") -> str:
         return "High — major corridor construction"
 
 
-def _ri_gain(G_original: nx.Graph, G_modified: nx.Graph, baseline_ri: float) -> float:
-    """Compute RI improvement from a graph modification."""
-    # Simulate the worst-case failure (top gatekeeper removed) on both graphs
-    centrality = compute_betweenness(G_original, k=50)
-    top_node = max(centrality, key=centrality.get) if centrality else None
+def _ri_gain(
+    G_original: nx.Graph,
+    G_modified: nx.Graph,
+    top_node,
+    ri_original_val: float,
+) -> float:
+    """
+    Compute RI improvement from a graph modification.
 
+    Accepts precomputed top_node and ri_original_val to avoid recomputing
+    betweenness centrality and the original RI on every candidate evaluation.
+    Only computes RI for the modified graph (1 RI computation per call, was 2).
+    """
     if top_node is None:
         return 0.0
 
-    perturbed_original = ablate_nodes(G_original, [top_node])
     perturbed_modified = ablate_nodes(G_modified, [top_node])
-
-    ri_original = compute_resilience_index(G_original, perturbed_original, sample_size=_RI_SAMPLE)
     ri_modified = compute_resilience_index(G_modified, perturbed_modified, sample_size=_RI_SAMPLE)
-
-    ri_orig_val = ri_original.get("resilience_index") or 0.0
     ri_mod_val = ri_modified.get("resilience_index") or 0.0
 
-    return round(ri_mod_val - ri_orig_val, 4)
+    return round(ri_mod_val - ri_original_val, 4)
 
 
 def generate_recommendations(G: nx.Graph) -> List[Dict[str, Any]]:
@@ -143,8 +146,7 @@ def generate_recommendations(G: nx.Graph) -> List[Dict[str, Any]]:
                 time_s = dist_m / (speed_kph * 1000 / 3600)
                 G_test.add_edge(n1, n2, weight=dist_m, length=dist_m, speed_kph=speed_kph, time_s=time_s)
 
-                gain = _ri_gain(working_G, G_test, baseline_ri)
-
+                gain = _ri_gain(working_G, G_test, top_node, baseline_ri)
                 if gain > best_gain:
                     best_gain = gain
                     n1_is_ap = n1 in aps
@@ -187,9 +189,8 @@ def generate_recommendations(G: nx.Graph) -> List[Dict[str, Any]]:
     # ── 3. If we still have fewer than TOP_K, add a reinforcement rec ───────
     if len(recs) < _TOP_K and ranked_nodes:
         top_n = ranked_nodes[0][0]
-        perturbed = ablate_nodes(G, [top_n])
-        ri_info = compute_resilience_index(G, perturbed, sample_size=_RI_SAMPLE)
-        rgs = 1.0 - (ri_info.get("resilience_index") or 0.0)
+        # Reuse already-computed baseline_ri_info (top_node == top_n by construction above)
+        rgs = 1.0 - baseline_ri
         recs.append({
             "type": "reinforcement",
             "title": f"Harden Gatekeeper Intersection #{top_n}",

@@ -81,7 +81,7 @@ def run_cascade(
             break
 
         # Recompute centrality on the perturbed graph
-        centrality = compute_betweenness(current_G, k=min(100, current_G.number_of_nodes()))
+        centrality = compute_betweenness(current_G, k=min(50, current_G.number_of_nodes()))
         max_score = max(centrality.values(), default=0)
 
         # Dampened threshold: rises each iteration so fewer nodes qualify

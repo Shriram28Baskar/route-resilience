@@ -12,7 +12,13 @@ build/
 
 # Env
 .env
+.env.*
+*.env
+*.env.*
 *.env.local
+.env.local
+!.env.example
+!.env.local.example
 
 # Data (large files — use DVC or LFS)
 backend/data/rasters/
@@ -51,6 +57,8 @@ backend/cache/
 *.json
 scratch.py
 test_request.py
+test_routes*.py
+test_size.py
 # Datasets (large, not version-controlled — use DVC or external storage)
 DataSet/
 P2_REPORT.md

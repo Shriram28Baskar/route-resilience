@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, WMSTileLayer, CircleMarker, Popup, Marker, useMapEvents, GeoJSON } from "react-leaflet";
+import { useEffect, useRef, useCallback, useState } from "react";
+import { MapContainer, TileLayer, WMSTileLayer, CircleMarker, Popup, Marker, useMapEvents, GeoJSON, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { centralityColor, findNearestNodeId } from "@/lib/utils";
@@ -46,6 +46,27 @@ const MAP_CENTER: [number, number] = [12.955, 77.605];
 const MAP_ZOOM = 13;
 
 function MapEvents({ geojson, onMapClick }: { geojson: GeoJSON.FeatureCollection | null, onMapClick?: (id: string) => void }) {
+  const map = useMap();
+
+  useEffect(() => {
+    // Force Leaflet to recalculate viewport after the flex layout settles.
+    // Three staggered calls ensure it catches the final dimensions.
+    map.invalidateSize();
+    const t1 = setTimeout(() => map.invalidateSize(), 100);
+    const t2 = setTimeout(() => map.invalidateSize(), 500);
+
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    observer.observe(map.getContainer());
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      observer.disconnect();
+    };
+  }, [map]);
+
   useMapEvents({
     click(e) {
       if (onMapClick && geojson) {
@@ -55,6 +76,21 @@ function MapEvents({ geojson, onMapClick }: { geojson: GeoJSON.FeatureCollection
     }
   });
   return null;
+}
+
+// ISRO mode: classify roads by highway type → colour-coded criticality tier
+// Module-level so it's a stable reference (never recreated on re-render)
+function getBhuvanRoadStyle(feature: any) {
+  const hw = feature?.properties?.highway || "";
+  if (["motorway", "motorway_link", "trunk", "trunk_link"].includes(hw))
+    return { color: "#E11D48", weight: 3, opacity: 0.9, fillOpacity: 0 };        // CRITICAL – deep rose
+  if (["primary", "primary_link"].includes(hw))
+    return { color: "#F97316", weight: 2.5, opacity: 0.85, fillOpacity: 0 };     // HIGH – burnt orange
+  if (["secondary", "secondary_link"].includes(hw))
+    return { color: "#F59E0B", weight: 2, opacity: 0.8, fillOpacity: 0 };        // MEDIUM – amber
+  if (["tertiary", "tertiary_link"].includes(hw))
+    return { color: "#06B6D4", weight: 1.5, opacity: 0.7, fillOpacity: 0 };      // LOW – cyan
+  return { color: "#A855F7", weight: 1, opacity: 0.45, fillOpacity: 0 };         // LOCAL – purple
 }
 
 export default function RoadMap({ 
@@ -92,19 +128,6 @@ export default function RoadMap({
     bhuvan: 'Esri World Topo Map | ISRO NNRMS Terrain Analysis &copy; <a href="https://bhuvan.nrsc.gov.in">NRSC/ISRO</a>'
   };
 
-  // ISRO mode: classify roads by highway type → colour-coded criticality tier
-  const getBhuvanRoadStyle = (feature: any) => {
-    const hw = feature?.properties?.highway || "";
-    if (["motorway", "motorway_link", "trunk", "trunk_link"].includes(hw))
-      return { color: "#E11D48", weight: 3, opacity: 0.9 };        // CRITICAL – deep rose
-    if (["primary", "primary_link"].includes(hw))
-      return { color: "#F97316", weight: 2.5, opacity: 0.85 };     // HIGH – burnt orange
-    if (["secondary", "secondary_link"].includes(hw))
-      return { color: "#F59E0B", weight: 2, opacity: 0.8 };        // MEDIUM – amber
-    if (["tertiary", "tertiary_link"].includes(hw))
-      return { color: "#06B6D4", weight: 1.5, opacity: 0.7 };      // LOW – cyan
-    return { color: "#A855F7", weight: 1, opacity: 0.45 };         // LOCAL – purple
-  };
 
   const roadLines = graphGeojson
     ? {
@@ -137,41 +160,12 @@ export default function RoadMap({
           className=""
         />
 
-        {/* Standard Modes: Dark / Light / Satellite — with optional catchment zone coloring */}
-        {roadLines && theme !== "bhuvan" && (
-          <GeoJSON
-            key={String(roadLines.features.length) + theme + (reliefCatchment ? Object.keys(reliefCatchment).length : 0)}
-            data={roadLines as any}
-            style={(feature) => {
-              if (reliefCatchment && feature?.properties) {
-                // Try to find a catchment assignment for either endpoint of the road segment
-                const srcId = feature.properties.source;
-                const tgtId = feature.properties.target;
-                const clusterIdx = reliefCatchment[srcId] ?? reliefCatchment[tgtId];
-                if (clusterIdx !== undefined) {
-                  const color = CATCHMENT_COLORS[clusterIdx % CATCHMENT_COLORS.length];
-                  return { color, weight: 2, opacity: 0.75 };
-                }
-              }
-              return {
-                color: theme === "dark"
-                  ? "rgba(168, 85, 247, 0.55)"   // purple glow on dark
-                  : theme === "light"
-                  ? "rgba(30, 41, 59, 0.25)"     // slate on light
-                  : "rgba(148, 163, 184, 0.45)", // muted slate on satellite
-                weight: theme === "dark" ? 1.5 : 1.2,
-                opacity: 1,
-              };
-            }}
-          />
-        )}
-
-        {/* ISRO Mode: Roads coloured by highway criticality tier */}
-        {roadLines && theme === "bhuvan" && (
-          <GeoJSON
-            key={String(roadLines.features.length) + "bhuvan"}
-            data={roadLines as any}
-            style={(feature) => getBhuvanRoadStyle(feature)}
+        {/* Road Lines — kept mounted, style updated imperatively to avoid re-mount lag */}
+        {roadLines && (
+          <RoadLinesLayer
+            roadLines={roadLines as any}
+            theme={theme}
+            reliefCatchment={reliefCatchment}
           />
         )}
 
@@ -302,6 +296,61 @@ export default function RoadMap({
       )}
 
     </div>
+  );
+}
+
+// ── Road Lines Layer ──────────────────────────────────────────────────────────
+// Kept permanently mounted — uses setStyle() on theme change instead of remounting
+// to avoid destroying/rebuilding 19k SVG path elements (~500ms lag).
+
+function RoadLinesLayer({
+  roadLines,
+  theme,
+  reliefCatchment,
+}: {
+  roadLines: GeoJSON.FeatureCollection;
+  theme: "dark" | "light" | "satellite" | "bhuvan";
+  reliefCatchment?: Record<string, number>;
+}) {
+  const layerRef = useRef<L.GeoJSON | null>(null);
+
+  const getStyle = useCallback((feature: any) => {
+    if (theme === "bhuvan") return getBhuvanRoadStyle(feature);
+    if (reliefCatchment && feature?.properties) {
+      const srcId = feature.properties.source;
+      const tgtId = feature.properties.target;
+      const clusterIdx = reliefCatchment[srcId] ?? reliefCatchment[tgtId];
+      if (clusterIdx !== undefined) {
+        const color = CATCHMENT_COLORS[clusterIdx % CATCHMENT_COLORS.length];
+        return { color, weight: 2, opacity: 0.75, fillOpacity: 0 };
+      }
+    }
+    return {
+      color: theme === "dark"
+        ? "rgba(168, 85, 247, 0.55)"
+        : theme === "light"
+        ? "rgba(30, 41, 59, 0.25)"
+        : "rgba(148, 163, 184, 0.45)",
+      weight: theme === "dark" ? 1.5 : 1.2,
+      opacity: 1,
+      fillOpacity: 0,
+    };
+  }, [theme, reliefCatchment]);
+
+  // When theme/catchment changes, update styles in-place — NO remount
+  useEffect(() => {
+    if (layerRef.current) {
+      layerRef.current.setStyle((feature) => getStyle(feature));
+    }
+  }, [getStyle]);
+
+  return (
+    <GeoJSON
+      key={String(roadLines.features.length)}
+      data={roadLines}
+      style={(feature) => getStyle(feature)}
+      ref={(layer) => { if (layer) layerRef.current = layer; }}
+    />
   );
 }
 
