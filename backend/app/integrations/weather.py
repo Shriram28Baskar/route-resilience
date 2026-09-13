@@ -2,7 +2,7 @@
 OpenWeatherMap integration for live weather data.
 
 API: OpenWeatherMap Current Weather + Forecast
-Key: 1e491167f254988273cd743809d7f075
+Key: Loaded from OWM_API_KEY environment variable
 
 Fetches:
   - Current weather conditions for Bengaluru (lat=12.9716, lon=77.5946)
@@ -24,7 +24,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-OWM_API_KEY = os.environ.get("OWM_API_KEY", "1e491167f254988273cd743809d7f075")
+OWM_API_KEY = os.environ.get("OWM_API_KEY", "")
 OWM_BASE = "https://api.openweathermap.org/data/2.5"
 
 # Bengaluru city centre
@@ -60,6 +60,19 @@ async def fetch_current_weather() -> Dict[str, Any]:
       - risk: flood risk classification
       - source: "OpenWeatherMap_Current_Weather_API"
     """
+    if not OWM_API_KEY:
+        logger.warning("OWM_API_KEY environment variable is not configured.")
+        return {
+            "error": "OWM_API_KEY not configured. Set OWM_API_KEY in backend/.env",
+            "city": "Bengaluru",
+            "current_rainfall_1h_mm": 0.0,
+            "current_rainfall_3h_mm": 0.0,
+            "temperature_c": 24.5,
+            "humidity_pct": 74,
+            "risk": {"level": "none", "description": "Weather API key not configured"},
+            "source": "OpenWeatherMap_Current_Weather_API",
+        }
+
     url = f"{OWM_BASE}/weather"
     params = {
         "lat": BENGALURU_LAT,
@@ -114,6 +127,18 @@ async def fetch_forecast_rain(hours: int = 24) -> Dict[str, Any]:
       - peak_risk: highest risk level in the window
       - hours_requested: the requested forecast window
     """
+    if not OWM_API_KEY:
+        logger.warning("OWM_API_KEY environment variable is not configured.")
+        return {
+            "error": "OWM_API_KEY not configured. Set OWM_API_KEY in backend/.env",
+            "forecast_items": [],
+            "max_rain_3h_mm": 0.0,
+            "total_rain_mm": 0.0,
+            "peak_risk": "none",
+            "hours_requested": hours,
+            "source": "OpenWeatherMap_5Day_Forecast_API",
+        }
+
     url = f"{OWM_BASE}/forecast"
     params = {
         "lat": BENGALURU_LAT,
