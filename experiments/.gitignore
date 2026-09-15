@@ -1,0 +1,3 @@
+# Raw outputs are committed only when their run has COMPLETED. A truncated
+# JSONL is indistinguishable from a finished one once it is in git history.
+results/*.log
