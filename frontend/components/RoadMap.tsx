@@ -39,6 +39,8 @@ interface RoadMapProps {
   cascadeSteps?: any[];
   activeRoute?: string;
   impactData?: AccessibilityImpactResponse | null;
+  projectedExposure?: Array<{ node_id: string; lat: number; lon: number; eta_minutes: number; risk_label: string }>;
+  citizenReports?: Array<{ report_id: string; lat: number; lon: number; severity: string; flooding_indicator: boolean; message: string; twin_agreement: string }>;
 }
 
 // Bengaluru AOI center
@@ -111,6 +113,8 @@ export default function RoadMap({
   activeRoute = "optimal",
   emergencyServices,
   impactData,
+  projectedExposure,
+  citizenReports,
 }: RoadMapProps) {
   const [theme, setTheme] = useState<"dark" | "light" | "satellite" | "bhuvan">("dark");
 
@@ -141,6 +145,7 @@ export default function RoadMap({
       <MapContainer
         center={MAP_CENTER}
         zoom={MAP_ZOOM}
+        preferCanvas={true}
         style={{ height: "100%", width: "100%", background: theme === "light" ? "#F3F4F6" : "#0B0F1A" }}
         zoomControl={true}
       >
@@ -177,6 +182,16 @@ export default function RoadMap({
         {/* Flood Simulation Layer */}
         {floodNodes && floodNodes.length > 0 && graphGeojson && (
           <FloodLayer floodNodes={floodNodes} graphGeojson={graphGeojson} />
+        )}
+
+        {/* Projected Flood Exposure Layer */}
+        {projectedExposure && projectedExposure.length > 0 && (
+          <ProjectedExposureLayer projectedExposure={projectedExposure} />
+        )}
+
+        {/* Citizen Evidence Layer */}
+        {citizenReports && citizenReports.length > 0 && (
+          <CitizenReportsLayer citizenReports={citizenReports} />
         )}
 
         {/* Relief Camps Layer */}
@@ -719,6 +734,67 @@ function ReliefCampLayer({ reliefCamps }: { reliefCamps: Array<{ id: string; lat
           </Popup>
         </Marker>
       ))}
+    </>
+  );
+}
+
+// ── AMDIROS Live Layers: Projected Exposure & Citizen Evidence ────────────────
+
+function ProjectedExposureLayer({ projectedExposure }: { projectedExposure: Array<{ node_id: string; lat: number; lon: number; eta_minutes: number; risk_label: string }> }) {
+  return (
+    <>
+      {projectedExposure.map((p) => {
+        const color = p.risk_label === "imminent" ? "#FF2D6B" : p.risk_label === "critical" ? "#FF8800" : "#FFB400";
+        return (
+          <CircleMarker
+            key={`proj-${p.node_id}`}
+            center={[p.lat, p.lon]}
+            radius={4}
+            pathOptions={{ color, fillColor: color, fillOpacity: 0.5, weight: 1, dashArray: "3 3" }}
+          >
+            <Popup>
+              <div className="text-xs font-mono">
+                <div className="font-bold text-[#FFB400]">⏳ Projected Flood Exposure</div>
+                <div>Node: {p.node_id}</div>
+                <div>Risk: <span className="font-semibold uppercase" style={{ color }}>{p.risk_label}</span></div>
+                <div>ETA: ~{p.eta_minutes.toFixed(1)} min</div>
+                <div className="text-[10px] text-gray-400 mt-1">EXTRAPOLATED · Linear runoff persistence</div>
+              </div>
+            </Popup>
+          </CircleMarker>
+        );
+      })}
+    </>
+  );
+}
+
+function CitizenReportsLayer({ citizenReports }: { citizenReports: Array<{ report_id: string; lat: number; lon: number; severity: string; flooding_indicator: boolean; message: string; twin_agreement: string }> }) {
+  return (
+    <>
+      {citizenReports.map((r) => {
+        const isFlooding = r.flooding_indicator;
+        const iconColor = r.twin_agreement === "DISAGREES" ? "#FF2D6B" : "#00E5B4";
+        const iconHtml = `<div style="width:22px;height:22px;background:#111827;border:2px solid ${iconColor};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;box-shadow:0 0 10px ${iconColor}80;">${isFlooding ? "🌊" : "📍"}</div>`;
+        const icon = L.divIcon({
+          html: iconHtml,
+          className: "",
+          iconSize: [22, 22],
+          iconAnchor: [11, 11],
+        });
+        return (
+          <Marker key={`citizen-${r.report_id}`} position={[r.lat, r.lon]} icon={icon}>
+            <Popup>
+              <div className="text-xs font-mono text-[#111827]">
+                <div className="font-bold" style={{ color: iconColor }}>📢 Citizen Evidence Layer</div>
+                <div><b>Severity:</b> {r.severity}</div>
+                <div><b>Digital Twin Validation:</b> {r.twin_agreement}</div>
+                <div className="mt-1 text-gray-700 font-sans italic">"{r.message}"</div>
+                <div className="text-[9px] text-gray-500 mt-1">Never mutates physical flood model truth</div>
+              </div>
+            </Popup>
+          </Marker>
+        );
+      })}
     </>
   );
 }

@@ -339,6 +339,40 @@ export async function prescribeAblation(ablatedNodeIds: string[], autoTopN = 0):
   });
 }
 
+export interface ApplyPrescriptionResponse {
+  success: boolean;
+  bridge: {
+    from_node: string;
+    to_node: string;
+    length_m: number;
+    time_s: number;
+  };
+  routing_verification: {
+    path_existed_before: boolean;
+    travel_time_before_s: number | "INF";
+    path_exists_after: boolean;
+    travel_time_after_s: number | null;
+    detour_reduction_pct: number;
+  };
+  active_graph_nodes: number;
+  active_graph_edges: number;
+  message: string;
+}
+
+export async function applyTacticalPrescription(params: {
+  from_node: string;
+  to_node: string;
+  length_m?: number;
+  time_s?: number;
+  origin_node?: string;
+  target_hospital_node?: string;
+}): Promise<ApplyPrescriptionResponse> {
+  return request<ApplyPrescriptionResponse>(`/simulate/ablate/prescribe/apply`, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
 export interface VulnerabilityCriticalNode {
   rank: number;
   node_id: string;
@@ -1067,4 +1101,197 @@ export async function dispatchManualAlert(payload: any) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+// ── AMDIROS Autonomous Loop API ───────────────────────────────────────────────
+
+export interface NodeETA {
+  node_id: string;
+  lat: number | null;
+  lon: number | null;
+  elevation_m: number;
+  eta_minutes: number;
+  risk_label: "imminent" | "critical" | "warning" | "watch";
+  data_type: "EXTRAPOLATED";
+  projection_basis: "linear_effective_runoff_persistence";
+}
+
+export interface HospStatus {
+  name: string;
+  lat: number;
+  lon: number;
+  reachable: boolean;
+  travel_time_s: number | null;
+}
+
+export interface EvacAdvisory {
+  ward_name: string;
+  action: "EVACUATE_NOW" | "EVACUATE_ADVISED" | "MONITOR";
+  population_estimate: number;
+  population_source: string;
+  flooded_node_count: number;
+  nearest_camp_id: string;
+  recommended_corridor: string;
+  travel_time_estimate_s: number;
+  hospital_reachable: boolean;
+}
+
+export interface CitizenReport {
+  report_id: string;
+  lat: number;
+  lon: number;
+  message: string;
+  severity: string;
+  snapped_node_id: number | null;
+  flooding_indicator: boolean;
+  received_at: string;
+  twin_agreement: "AGREES" | "DISAGREES" | "UNVERIFIABLE";
+  twin_note: string;
+}
+
+export interface ActionPlan {
+  sequence_no: number;
+  created_at: string;
+  relief_camps: { id: string; lat: number; lng: number; [k: string]: unknown }[];
+  evacuation_advisories: EvacAdvisory[];
+  tactical_prescriptions: unknown[];
+  affected_ward_count: number;
+  hospitals_isolated: number;
+}
+
+export interface DecisionEvent {
+  severity: "HIGH" | "MEDIUM" | "LOW";
+  trigger_reason: string;
+  changed_components: string[];
+}
+
+export interface DisasterStateUpdate {
+  type: "DISASTER_STATE_UPDATE";
+  sequence_no: number;
+  observed_at: string;
+  loop_duration_s: number;
+  partial: boolean;
+  rainfall_rate_mm_h: number;
+  water_level_m: number;
+  flooded_node_count: number;
+  flooded_node_ids?: string[];
+  resilience_index: number | null;
+  partition_count: number;
+  affected_wards: string[];
+  population_at_risk: number;
+  hospital_status: HospStatus[];
+  citizen_reports: CitizenReport[];
+  predicted_flood_exposure: NodeETA[];
+  action_plan: ActionPlan | null;
+  narrative: string;
+  narrative_source: "llm" | "template";
+  material_change: boolean;
+  decision_event: DecisionEvent | null;
+}
+
+export interface LoopHeartbeat {
+  type: "LOOP_HEARTBEAT";
+  sequence_no: number;
+  observed_at: string;
+  rainfall_rate_mm_h: number;
+  material_change: false;
+  retained_from_seq: number;
+}
+
+export type WsDisasterMessage = DisasterStateUpdate | LoopHeartbeat;
+
+/** Trigger one immediate autonomous observation cycle with optional rainfall injection. */
+export async function triggerLoop(rainfallRateMmH?: number): Promise<{ triggered: boolean; current_seq: number | null }> {
+  return request("/simulate/trigger-loop", {
+    method: "POST",
+    body: JSON.stringify({ rainfall_rate_mm_h: rainfallRateMmH ?? null }),
+  });
+}
+
+/** Get the latest DisasterState (use on page load before WS connects). */
+export async function getCurrentDisasterState(): Promise<DisasterStateUpdate | { status: string }> {
+  return request("/simulate/current-state");
+}
+
+/** Get last N states from the ring buffer (max 12). */
+export async function getStateHistory(n = 12): Promise<{ count: number; states: DisasterStateUpdate[] }> {
+  return request(`/simulate/state-history?n=${n}`);
+}
+
+/** Get current ward-level evacuation advisories. */
+export async function getEvacuationAdvisory(): Promise<{ sequence_no: number; advisories: EvacAdvisory[] }> {
+  return request("/simulate/evacuation-advisory");
+}
+
+/** Get current Projected Flood Exposure ETA list. */
+export async function getPredictedFloodExposure(): Promise<{ predictions: NodeETA[]; data_type: string }> {
+  return request("/simulate/predict-flood-exposure");
+}
+
+export interface CitizenReportRequest {
+  lat: number;
+  lon: number;
+  message: string;
+  severity: "critical" | "high" | "moderate" | "low";
+}
+
+export interface CitizenReportResponse {
+  status: string;
+  report_id: string;
+  snapped_node_id: number;
+  snap_distance_m: number;
+  flooding_indicator: boolean;
+  twin_agreement: "AGREES" | "DISAGREES" | "UNVERIFIABLE";
+  twin_note: string;
+}
+
+/** Submit a citizen distress report. */
+export async function submitCitizenReport(report: CitizenReportRequest): Promise<CitizenReportResponse> {
+  return request("/citizens/report", {
+    method: "POST",
+    body: JSON.stringify(report),
+  });
+}
+
+/** Get recent citizen reports. */
+export async function getCitizenReports(n = 50): Promise<{ count: number; reports: CitizenReport[] }> {
+  return request(`/citizens/reports?n=${n}`);
+}
+
+/** Clear all citizen reports (demo reset). */
+export async function clearCitizenReports(): Promise<{ status: string }> {
+  return request("/citizens/reports", { method: "DELETE" });
+}
+
+/** Pre-scripted demo reports for fallback demonstration. */
+export const DEMO_CITIZEN_REPORTS: CitizenReportRequest[] = [
+  {
+    lat: 12.9352, lon: 77.6245,
+    message: "Road completely flooded near Koramangala 1st block. Cars stuck, water above tyre level.",
+    severity: "high",
+  },
+  {
+    lat: 12.9150, lon: 77.6240,
+    message: "Water entering homes on HSR Layout 27th Main. Families need evacuation help.",
+    severity: "critical",
+  },
+  {
+    lat: 12.9576, lon: 77.6374,
+    message: "Underpass near Marathahalli completely blocked with water. Buses have been diverted.",
+    severity: "high",
+  },
+];
+
+/** Post all three pre-scripted demo reports sequentially. */
+export async function runDemoCitizenReports(): Promise<CitizenReportResponse[]> {
+  const results: CitizenReportResponse[] = [];
+  for (const report of DEMO_CITIZEN_REPORTS) {
+    try {
+      const res = await submitCitizenReport(report);
+      results.push(res);
+    } catch (e) {
+      console.error("Demo report failed:", e);
+    }
+  }
+  return results;
 }

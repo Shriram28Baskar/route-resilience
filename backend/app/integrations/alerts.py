@@ -58,6 +58,7 @@ async def ws_connect(websocket: WebSocket):
 
 async def broadcast_ws(payload: Dict[str, Any]):
     """Broadcast alert to all connected WebSocket clients."""
+    global _ws_clients
     if not _ws_clients:
         return
     message = json.dumps(payload)
@@ -183,3 +184,32 @@ async def dispatch_alert(
         "alert": alert,
         "dispatch_results": results,
     }
+
+
+# ── AMDIROS loop broadcast helpers ────────────────────────────────────────────
+# These functions are called by the autonomous loop (main.py) to push
+# full DisasterState updates and heartbeats to all connected WebSocket clients.
+# They reuse the existing broadcast_ws() primitive — no new WS endpoints needed.
+
+async def broadcast_disaster_state(state_dict: dict) -> None:
+    """
+    Push a full DISASTER_STATE_UPDATE payload to all connected WS clients.
+    state_dict must be the JSON-serializable output of state_to_ws_dict().
+    """
+    await broadcast_ws(state_dict)
+    logger.debug(
+        f"Broadcast DISASTER_STATE_UPDATE seq={state_dict.get('sequence_no')} "
+        f"to {len(_ws_clients)} client(s)."
+    )
+
+
+async def broadcast_heartbeat(heartbeat_dict: dict) -> None:
+    """
+    Push a LOOP_HEARTBEAT payload when no material change is detected.
+    heartbeat_dict must be the output of disaster_state.heartbeat_dict().
+    """
+    await broadcast_ws(heartbeat_dict)
+    logger.debug(
+        f"Broadcast LOOP_HEARTBEAT seq={heartbeat_dict.get('sequence_no')} "
+        f"to {len(_ws_clients)} client(s)."
+    )

@@ -122,13 +122,13 @@ async def weather_trigger(req: WeatherTriggerRequest):
         title=f"Live Rainfall Alert — {rain_1h:.1f}mm/hr in Bengaluru",
         message=(
             f"OpenWeatherMap reports {rain_1h:.1f}mm rainfall in the last hour over Bengaluru. "
-            f"DEM flood model estimates water level {water_level_m:.3f}m ASL. "
+            f"DEM flood model derives threshold {water_level_m:.3f}m. "
             f"Predicted impact: {flooded_count} road network nodes affected."
         ),
         details={
             "Rainfall (1h)": f"{rain_1h:.2f} mm",
             "Risk Level": risk.get("level", "").upper(),
-            "Estimated Water Level": f"{water_level_m:.3f} m ASL",
+            "Derived Flood Threshold": f"{water_level_m:.3f} m",
             "Predicted Flooded Nodes": flooded_count,
             "Flood Model": "SRTMGL1_30m_static_approximation",
             "Weather Source": "OpenWeatherMap_Current_Weather_API",

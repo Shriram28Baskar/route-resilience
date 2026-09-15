@@ -10,6 +10,7 @@ import {
   getGraphGeoJSON, compareAblation, prescribeAblation, getVulnerability,
   fetchFloodAccessibilityImpact, fetchWardReport, runRainfallBacktest, fetchCurrentWeather,
   fetchHistoricalScenario, connectAlertWebSocket, triggerWeatherAlert, type FloodAlert,
+  applyTacticalPrescription, type ApplyPrescriptionResponse,
 } from "@/lib/api";
 import type {
   AblationResponse, CriticalityResponse, Recommendation, FragilityResponse,
@@ -25,9 +26,10 @@ import { Waves, Tent } from "lucide-react";
 import { Users, Car, TrendingDown } from "lucide-react";
 import { IncidentBriefModal } from "@/components/IncidentBriefModal";
 import HistoricalScenarioResults from "@/components/HistoricalScenarioResults";
+import { DisasterStateProvider, useDisasterState } from "@/contexts/DisasterStateContext";
 
 
-type Tab = "ablate" | "route" | "scenarios" | "flood" | "traffic";
+type Tab = "ablate" | "route" | "scenarios" | "flood" | "traffic" | "amdiros";
 
 export default function SimulatePage() {
   const [tab, setTab] = useState<Tab>("ablate");
@@ -364,7 +366,8 @@ export default function SimulatePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F1A] p-6">
+    <DisasterStateProvider>
+      <div className="min-h-screen bg-[#0B0F1A] p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -505,7 +508,7 @@ export default function SimulatePage() {
             {tab === "flood" && (
               <div className="bg-[#111827] border border-white/8 rounded-xl p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-display font-semibold text-sm uppercase tracking-widest text-[#6B7280]">Water Level (m ASL)</h2>
+                  <h2 className="font-display font-semibold text-sm uppercase tracking-widest text-[#6B7280]">Derived Flood Threshold (m)</h2>
                   <button onClick={() => setIsPlayingFlood(!isPlayingFlood)} className={`px-3 py-1 rounded text-xs font-bold transition-colors ${isPlayingFlood ? "bg-[#FF4444] text-white" : "bg-[#00E5B4] text-[#0B0F1A]"}`}>
                     {isPlayingFlood ? "⏸ Pause" : "▶ Play Animation"}
                   </button>
@@ -674,7 +677,8 @@ export default function SimulatePage() {
           wardReport={wardReport} 
         />
       )}
-    </div>
+      </div>
+    </DisasterStateProvider>
   );
 }
 
@@ -686,6 +690,47 @@ const RoadMap = dynamic(() => import("@/components/RoadMap"), { ssr: false });
 
 function SimulateResults({ tab, result, ablation, cascade, route, centrality, graphGeojson, srcNode, tgtNode, selectedNodes, onMapClick, recommendations, prescriptions, investmentSim, fragility, scenarios, flood, relief, equityMetrics, trafficImpact, degradation, handleSimulateInvestment, loading, vulnerability, isSyncing, floodImpact, wardReport, backtest, weather, handleWeather, historicalScenario, waterLevel }: any) {
   const [activeRoute, setActiveRoute] = useState<string>("optimal");
+  const { state: disasterState } = useDisasterState();
+
+  const isAmdiros = tab === "amdiros";
+
+  const liveFloodNodes = isAmdiros
+    ? (disasterState?.flooded_node_ids && disasterState.flooded_node_ids.length > 0
+        ? disasterState.flooded_node_ids
+        : (flood?.ablated_nodes ?? []))
+    : flood?.ablated_nodes;
+
+  const liveReliefCamps = isAmdiros
+    ? (disasterState?.action_plan?.relief_camps?.map((c: any) => ({
+        id: String(c.id || c.node_id || ""),
+        lat: Number(c.lat),
+        lng: Number(c.lng),
+        node_count: c.node_count,
+        population_estimate: c.population_estimate,
+      })) ?? (relief?.camps ?? []))
+    : relief?.camps;
+
+  const liveProjectedExposure = isAmdiros
+    ? (disasterState?.predicted_flood_exposure?.map((n) => ({
+        node_id: String(n.node_id),
+        lat: Number(n.lat),
+        lon: Number(n.lon),
+        eta_minutes: Number(n.eta_minutes),
+        risk_label: String(n.risk_label),
+      })) ?? [])
+    : undefined;
+
+  const liveCitizenReports = isAmdiros
+    ? (disasterState?.citizen_reports?.map((r) => ({
+        report_id: String(r.report_id),
+        lat: Number(r.lat),
+        lon: Number(r.lon),
+        severity: String(r.severity),
+        flooding_indicator: Boolean(r.flooding_indicator),
+        message: String(r.message),
+        twin_agreement: String(r.twin_agreement),
+      })) ?? [])
+    : undefined;
 
   return (
     <div className="space-y-4">
@@ -693,7 +738,7 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
       <div className={`h-[400px] w-full rounded-xl overflow-hidden border border-white/8 relative bg-[#111827] ${tab === 'fragility' || tab === 'scenarios' ? 'hidden' : ''}`}>
         {graphGeojson ? (
           <RoadMap
-            centrality={tab === "flood" || tab === "relief" ? null : centrality}
+            centrality={tab === "flood" || tab === "relief" || isAmdiros ? null : centrality}
             hospitals={null}
             equity={null}
             activeLayer="simulate"
@@ -703,11 +748,13 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
             tgtNodeId={tgtNode}
             selectedNodes={selectedNodes}
             onMapClick={onMapClick}
-            floodNodes={flood?.ablated_nodes}
-            reliefCamps={relief?.camps}
-            reliefCatchment={relief?.catchment_mapping}
+            floodNodes={liveFloodNodes}
+            reliefCamps={liveReliefCamps}
+            reliefCatchment={isAmdiros ? undefined : relief?.catchment_mapping}
             cascadeSteps={tab === 'ablate' ? cascade?.cascade_steps : undefined}
             activeRoute={activeRoute}
+            projectedExposure={liveProjectedExposure}
+            citizenReports={liveCitizenReports}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-[#6B7280] text-sm flex-col gap-2">
@@ -716,7 +763,17 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
           </div>
         )}
         <div className="absolute top-4 left-4 z-[1000] bg-[#111827]/90 px-3 py-2 rounded shadow text-xs text-white pointer-events-none">
-          {tab === "route" 
+          {isAmdiros ? (
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#00E5B4] animate-pulse"></span>
+              <span>
+                <b>AMDIROS Autonomous Twin:</b> Loop #{disasterState?.sequence_no ?? 0} ·{" "}
+                <span className="text-[#0EA5E9] font-mono">{liveFloodNodes?.length ?? 0} flooded</span> ·{" "}
+                <span className="text-[#FFB400] font-mono">{liveProjectedExposure?.length ?? 0} ETA watch</span> ·{" "}
+                <span className="text-[#8B5CF6] font-mono">{liveReliefCamps?.length ?? 0} relief camps</span>
+              </span>
+            </div>
+          ) : tab === "route" 
             ? "Click map to set Source/Target." 
             : "Click map to select nodes for ablation."}
         </div>
@@ -876,10 +933,15 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
             <AgingForecastResults data={degradation} />
           </motion.div>
         )}
-        {!ablation && !cascade && !route && !recommendations && !fragility && !scenarios && !flood && !relief && !equityMetrics && !trafficImpact && !degradation && (
+        {!ablation && !cascade && !route && !recommendations && !fragility && !scenarios && !flood && !relief && !equityMetrics && !trafficImpact && !degradation && tab !== "amdiros" && (
           <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             className="bg-[#111827] border border-white/8 rounded-xl p-8 text-center">
             <p className="text-[#6B7280] text-sm">Configure nodes and run a simulation to see results.</p>
+          </motion.div>
+        )}
+        {tab === "amdiros" && (
+          <motion.div key="amdiros" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
+            <AMDIROSPanel />
           </motion.div>
         )}
       </AnimatePresence>
@@ -1477,6 +1539,28 @@ function RouteCard({ title, route, color }: { title: string; route: any; color: 
 import { Shield, Waypoints } from "lucide-react";
 
 function RecommendationsResults({ recommendations, prescriptions, investmentSim, onSimulate, loading }: { recommendations: Recommendation[], prescriptions: any[] | null, investmentSim: any, onSimulate: (idx: number) => void, loading: boolean }) {
+  const [appliedInterventions, setAppliedInterventions] = useState<Record<number, ApplyPrescriptionResponse>>({});
+  const [applyingIdx, setApplyingIdx] = useState<number | null>(null);
+
+  const handleApply = async (rec: any, idx: number) => {
+    setApplyingIdx(idx);
+    try {
+      const res = await applyTacticalPrescription({
+        from_node: String(rec.from_node),
+        to_node: String(rec.to_node),
+        length_m: 50.0,
+        time_s: 6.0,
+        origin_node: "12121597668",
+        target_hospital_node: "573433807",
+      });
+      setAppliedInterventions(prev => ({ ...prev, [idx]: res }));
+    } catch (err) {
+      console.error("Failed to apply intervention:", err);
+    } finally {
+      setApplyingIdx(null);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {investmentSim && (
@@ -1530,6 +1614,27 @@ function RecommendationsResults({ recommendations, prescriptions, investmentSim,
                   <div className="text-[10px] text-[#6B7280] uppercase tracking-wider mb-1">Tactical Gain Score</div>
                   <div className="font-mono text-sm text-[#FF4444]">+{rec.estimated_resilience_gain.toFixed(3)}</div>
                 </div>
+              </div>
+
+              {/* ACTION: APPLY TO LIVE ROUTING GRAPH */}
+              <div className="pt-2 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <button
+                  type="button"
+                  disabled={applyingIdx === idx || !!appliedInterventions[idx]}
+                  onClick={() => handleApply(rec, idx)}
+                  className="px-3 py-1.5 bg-[#00E5B4]/15 hover:bg-[#00E5B4]/25 border border-[#00E5B4]/40 text-[#00E5B4] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  {applyingIdx === idx
+                    ? "Reconfiguring Live Graph..."
+                    : appliedInterventions[idx]
+                    ? "✓ Applied to Live Graph"
+                    : "Apply Tactical Bridge"}
+                </button>
+                {appliedInterventions[idx] && (
+                  <div className="text-[11px] font-mono text-[#00E5B4] bg-[#00E5B4]/10 px-2 py-1 rounded border border-[#00E5B4]/20">
+                    Edges: {appliedInterventions[idx].active_graph_edges} | Travel Time: {appliedInterventions[idx].routing_verification.travel_time_after_s}s
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -1751,6 +1856,7 @@ const TABS = [
   { id: "flood",   label: "Flood Sim",         icon: Waves },
   { id: "traffic", label: "Traffic Modeler",   icon: Car },
   { id: "scenarios", label: "Compare Scenarios", icon: LayoutGrid },
+  { id: "amdiros", label: "🔄 AMDIROS Live",   icon: Activity },
 ];
 
 const TAB_ACTIONS: Record<Tab, string> = {
@@ -1759,6 +1865,7 @@ const TAB_ACTIONS: Record<Tab, string> = {
   scenarios: "Compare Scenarios",
   flood: "Simulate Flood",
   traffic: "Model Traffic Impact",
+  amdiros: "",
 };
 
 // ── Social Impact Results ─────────────────────────────────────────────────────
@@ -2170,6 +2277,25 @@ function AgingForecastResults({ data }: { data: DegradationForecastResponse }) {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── AMDIROS Live Intelligence Panel ───────────────────────────────────────────
+import LoopStatusBar from "@/components/LoopStatusBar";
+import IncidentCommanderPanel from "@/components/IncidentCommanderPanel";
+import EvacuationAdvisoryTable from "@/components/EvacuationAdvisoryTable";
+import CitizenIntelligenceWidget from "@/components/CitizenIntelligenceWidget";
+
+function AMDIROSPanel() {
+  return (
+    <div className="space-y-4">
+      <LoopStatusBar />
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <IncidentCommanderPanel />
+        <CitizenIntelligenceWidget />
+      </div>
+      <EvacuationAdvisoryTable />
     </div>
   );
 }

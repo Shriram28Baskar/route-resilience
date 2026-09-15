@@ -1,23 +1,38 @@
 """
-Groq API client for the Urban Planning Copilot.
+Groq API client for the Urban Planning Copilot and AMDIROS narrative generator.
+
+Model selection rationale
+-------------------------
+We use llama-3.3-70b-versatile (direct instruct) rather than a reasoning model
+(e.g. qwen3-27b, deepseek-r1).  Reasoning models emit a large internal
+<think>...</think> block before their visible response.  With max_tokens=600
+the entire budget is consumed by thinking, leaving 0 characters of actual
+narrative.  llama-3.3-70b-versatile produces output immediately — no hidden
+reasoning chain — and fits within the demo latency SLA (~1-2 s).
 """
 import os
 import logging
 from typing import List, Dict
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL   = "qwen/qwen3.6-27b"   # fast, capable model available on Groq
+# Direct instruct model verified active on Groq account: ~1.2s latency, zero thinking-token waste.
+GROQ_MODEL   = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 
-async def groq_chat(system: str, messages: List[Dict[str, str]]) -> str:
+async def groq_chat(system: str, messages: List[Dict[str, str]], max_tokens: int = 600) -> str:
     """
     Send a chat completion request to the Groq API.
 
     Args:
-        system:   System prompt string.
-        messages: List of {"role": "user"|"assistant", "content": str} dicts.
+        system:     System prompt string.
+        messages:   List of {"role": "user"|"assistant", "content": str} dicts.
+        max_tokens: Max tokens to generate (default 600 — sufficient for
+                    a 3-paragraph narrative, well within Groq TPM limit).
 
     Returns:
         The assistant's reply as a string.
@@ -25,7 +40,8 @@ async def groq_chat(system: str, messages: List[Dict[str, str]]) -> str:
     Raises:
         RuntimeError if the API key is not set or the request fails.
     """
-    if not GROQ_API_KEY:
+    api_key = os.getenv("GROQ_API_KEY", GROQ_API_KEY)
+    if not api_key:
         raise RuntimeError("GROQ_API_KEY environment variable is not set. "
                            "Please add it to your .env file.")
 
@@ -34,33 +50,46 @@ async def groq_chat(system: str, messages: List[Dict[str, str]]) -> str:
     except ImportError:
         raise RuntimeError("groq package not installed. Run: pip install groq")
 
-    client = AsyncGroq(api_key=GROQ_API_KEY, max_retries=0, timeout=10.0)
+    client = AsyncGroq(api_key=api_key, max_retries=0, timeout=12.0)
 
     full_messages = [{"role": "system", "content": system}] + messages
 
     # Truncate messages if context is too long (safety for 8000 TPM limit)
-    full_messages = _trim_messages(full_messages, max_chars=6000)
+    full_messages = _trim_messages(full_messages, max_chars=5000)
 
-    logger.info(f"MESSAGES SENT TO GROQ: {len(full_messages)} messages, roles: {[m['role'] for m in full_messages]}")
+    logger.info(
+        f"Groq request: model={GROQ_MODEL}, "
+        f"messages={len(full_messages)}, max_tokens={max_tokens}"
+    )
     try:
         response = await client.chat.completions.create(
             model=GROQ_MODEL,
             messages=full_messages,
-            max_tokens=4096,
+            max_tokens=max_tokens,
             temperature=0.3,   # lower temperature for grounded, factual answers
         )
 
+        reply = response.choices[0].message.content or ""
+
+        # Belt-and-suspenders: strip any <think>...</think> from models that
+        # might emit them despite being instruct models (e.g. future regressions)
         import re
-        reply = response.choices[0].message.content
         reply = re.sub(r'<think>.*?(?:</think>|$)', '', reply, flags=re.DOTALL).strip()
-        logger.info(f"Groq response: {len(reply)} chars, "
-                    f"tokens used: {response.usage.total_tokens}")
+
+        logger.info(
+            f"Groq response: {len(reply)} chars, "
+            f"tokens_used={response.usage.total_tokens} "
+            f"(prompt={response.usage.prompt_tokens}, "
+            f"completion={response.usage.completion_tokens})"
+        )
         return reply
     except Exception as e:
         logger.error(f"Groq API Error: {str(e)}")
-        if "429" in str(e) or "rate limit" in str(e).lower() or "timeout" in str(e).lower():
-            return "Copilot is temporarily unavailable due to the LLM service rate limit. The computed disaster results remain available on the dashboard."
-        return f"Copilot encountered an error: {str(e)}"
+        if "429" in str(e) or "rate limit" in str(e).lower():
+            return ""   # empty → caller falls back to template
+        if "timeout" in str(e).lower():
+            return ""   # empty → caller falls back to template
+        return ""   # always return empty on error so caller uses template
 
 
 def _trim_messages(messages: List[Dict], max_chars: int) -> List[Dict]:

@@ -114,8 +114,8 @@ export function IncidentBriefModal({ onClose, flood, floodImpact, wardReport }: 
               <div className="text-[9px] text-[#6B7280] mt-1">OSMnx Geometric Sum</div>
             </div>
             <div className="bg-[#111827] border border-white/10 rounded-xl p-4">
-              <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1">Max Simulation Water Level</div>
-              <div className="font-mono text-2xl font-bold text-white">{flood?.water_level !== undefined ? `${flood.water_level}m ASL` : "N/A"}</div>
+              <div className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1">Derived Flood Threshold</div>
+              <div className="font-mono text-2xl font-bold text-white">{flood?.water_level !== undefined ? `${flood.water_level}m` : "N/A"}</div>
               <div className="text-[9px] text-[#6B7280] mt-1">NASA SRTMGL1 DEM</div>
             </div>
           </section>

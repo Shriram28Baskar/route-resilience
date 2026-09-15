@@ -7,7 +7,7 @@ POST /route             → shortest path, baseline vs. post-ablation
 """
 import logging
 import networkx as nx
-from typing import List
+from typing import List, Optional, Dict
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
@@ -20,7 +20,10 @@ from app.simulation.cascade import run_cascade
 from app.simulation.routing import compute_route
 from app.simulation.scenarios import run_multi_scenario
 from app.simulation.population import estimate_population_impact
-from app.simulation.recommendations import generate_recommendations
+from app.simulation.recommendations import (
+    cache_recommendations, generate_recommendations, get_cached_recommendations,
+    recommendations_are_cached,
+)
 from app.simulation.fragility import generate_fragility_curve
 from app.graph_pipeline.centrality import compute_betweenness
 from app.graph_pipeline.metrics import compute_graph_metrics
@@ -35,9 +38,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # ── Module-level result caches (populated at startup by warmup thread) ────────
-# Recommendations and predefined scenarios are computed from a static OSM graph
-# and never change between requests — serving from cache makes them instant.
-_RECOMMENDATIONS_CACHE: dict = {}   # {"data": List[Recommendation]}
+# Predefined scenarios are computed from a static OSM graph during warmup.
+# Tactical recommendations use the thread-safe cache in recommendations.py so
+# the autonomous loop and this endpoint see exactly the same deterministic data.
 _SCENARIO_CACHE: dict = {}          # {"predefined": List[ScenarioResult]}
 
 
@@ -585,6 +588,95 @@ def ablate_prescribe(req: PrescribeRequest):
     })
 
 
+class ApplyPrescriptionRequest(BaseModel):
+    from_node: str
+    to_node: str
+    length_m: Optional[float] = 50.0
+    time_s: Optional[float] = 6.0
+    origin_node: Optional[str] = None
+    target_hospital_node: Optional[str] = None
+
+
+@router.post("/ablate/prescribe/apply")
+def apply_tactical_prescription(req: ApplyPrescriptionRequest):
+    """
+    Apply a tactical infrastructure prescription to the active in-memory graph.
+    Mutates the graph by adding a temporary bridge/bypass edge and immediately
+    recomputes Dijkstra routing to prove operational recovery.
+    """
+    G = GraphStore.get_healed() or GraphStore.get_osm_fallback()
+    if G is None:
+        raise HTTPException(status_code=404, detail="No graph available.")
+
+    node_map = {str(n): n for n in G.nodes()}
+    u = node_map.get(req.from_node)
+    v = node_map.get(req.to_node)
+
+    if u is None or v is None:
+        raise HTTPException(status_code=400, detail=f"Endpoints not found in graph: {req.from_node}, {req.to_node}")
+
+    # Check routing before if endpoints provided
+    path_before_exists = False
+    time_before = None
+    if req.origin_node and req.target_hospital_node:
+        orig = node_map.get(req.origin_node)
+        dest = node_map.get(req.target_hospital_node)
+        if orig and dest:
+            try:
+                time_before = nx.shortest_path_length(G, orig, dest, weight="time_s")
+                path_before_exists = True
+            except nx.NetworkXNoPath:
+                path_before_exists = False
+                time_before = None
+
+    # Mutate in-memory routing graph
+    dist = req.length_m or 50.0
+    travel_time = req.time_s or (dist / 8.33)
+    G.add_edge(u, v, length=dist, weight=dist, time_s=travel_time, highway="tactical_bridge", is_temporary=True)
+    G.add_edge(v, u, length=dist, weight=dist, time_s=travel_time, highway="tactical_bridge", is_temporary=True)
+
+    # Recompute routing after mutation
+    path_after_exists = False
+    time_after = None
+    detour_reduction_pct = 0.0
+    if req.origin_node and req.target_hospital_node:
+        orig = node_map.get(req.origin_node)
+        dest = node_map.get(req.target_hospital_node)
+        if orig and dest:
+            try:
+                time_after = nx.shortest_path_length(G, orig, dest, weight="time_s")
+                path_after_exists = True
+                if time_before and time_before > 0:
+                    detour_reduction_pct = max(0.0, ((time_before - time_after) / time_before) * 100.0)
+                elif not path_before_exists:
+                    detour_reduction_pct = 100.0
+            except nx.NetworkXNoPath:
+                path_after_exists = False
+
+    logger.info(f"Tactical bridge applied: ({u} <-> {v}, {dist}m). Recomputed routing: {time_after}s.")
+
+    return JSONResponse({
+        "success": True,
+        "bridge": {
+            "from_node": str(u),
+            "to_node": str(v),
+            "length_m": round(dist, 2),
+            "time_s": round(travel_time, 2),
+        },
+        "routing_verification": {
+            "path_existed_before": path_before_exists,
+            "travel_time_before_s": round(time_before, 2) if time_before is not None else "INF",
+            "path_exists_after": path_after_exists,
+            "travel_time_after_s": round(time_after, 2) if time_after is not None else None,
+            "detour_reduction_pct": round(detour_reduction_pct, 1),
+        },
+        "active_graph_nodes": G.number_of_nodes(),
+        "active_graph_edges": G.number_of_edges(),
+        "message": f"Tactical bridge successfully installed in active routing graph between nodes #{u} and #{v}."
+    })
+
+
+
 class VulnerabilityRequest(BaseModel):
     top_n: int = 20
 
@@ -830,15 +922,15 @@ def get_recommendations():
     Returns infrastructure upgrade and bypass recommendations based on resilience gain.
     Served from startup cache (instant). Falls back to live computation if cache not ready.
     """
-    if "data" in _RECOMMENDATIONS_CACHE:
-        return JSONResponse({"recommendations": _RECOMMENDATIONS_CACHE["data"], "cached": True})
+    if recommendations_are_cached():
+        return JSONResponse({"recommendations": get_cached_recommendations(), "cached": True})
 
     G = GraphStore.get_healed() or GraphStore.get_osm_fallback()
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
 
     recs = generate_recommendations(G)
-    _RECOMMENDATIONS_CACHE["data"] = recs   # populate cache for next time
+    cache_recommendations(recs)
     return JSONResponse({"recommendations": recs, "cached": False})
 
 class SimulateInvestmentRequest(BaseModel):
@@ -853,7 +945,11 @@ def simulate_investment(req: SimulateInvestmentRequest):
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
         
-    recs = generate_recommendations(G)
+    if recommendations_are_cached():
+        recs = get_cached_recommendations()
+    else:
+        recs = generate_recommendations(G)
+        cache_recommendations(recs)
     if req.recommendation_idx < 0 or req.recommendation_idx >= len(recs):
         raise HTTPException(status_code=400, detail="Invalid recommendation index.")
         
@@ -1033,3 +1129,109 @@ def run_evacuation(req: EvacuationRequest):
         time_horizon_hours=req.time_horizon_hours,
     )
     return JSONResponse(result)
+
+
+# ── AMDIROS Autonomous Loop Endpoints ─────────────────────────────────────────
+
+class TriggerLoopRequest(BaseModel):
+    rainfall_rate_mm_h: Optional[float] = None
+
+
+@router.post("/trigger-loop", tags=["Autonomous Loop"])
+async def trigger_loop_now(req: Optional[TriggerLoopRequest] = None):
+    """
+    Immediately fire one autonomous observation cycle with optional rainfall injection.
+    Useful for demo control — e.g. injecting a 65 mm/h storm surge or resetting to 0.
+    """
+    from app.main import get_manual_trigger, set_manual_rainfall_override
+    if req and req.rainfall_rate_mm_h is not None:
+        set_manual_rainfall_override(req.rainfall_rate_mm_h)
+    trigger = get_manual_trigger()
+    trigger.set()
+    latest = None
+    try:
+        from app.simulation.disaster_state import state_ring_buffer
+        latest = state_ring_buffer.get_latest()
+    except Exception:
+        pass
+    return JSONResponse({
+        "triggered": True,
+        "message": "Loop queued — will execute immediately.",
+        "injected_rainfall": req.rainfall_rate_mm_h if req else None,
+        "current_seq": latest.sequence_no if latest else None,
+    })
+
+
+
+@router.get("/current-state", tags=["Autonomous Loop"])
+async def get_current_state():
+    """
+    Return the latest DisasterState as JSON.
+    Use this on page load to hydrate the UI before the WebSocket connects.
+    """
+    from app.simulation.disaster_state import state_ring_buffer, state_to_ws_dict
+    state = state_ring_buffer.get_latest()
+    if state is None:
+        return JSONResponse({"status": "no_state", "message": "Autonomous loop has not run yet."})
+    return JSONResponse(state_to_ws_dict(state))
+
+
+@router.get("/state-history", tags=["Autonomous Loop"])
+async def get_state_history(n: int = 12):
+    """
+    Return the last N states from the ring buffer.
+
+    Ring buffer capacity: 12 states.
+    At 5-min production cadence: 60 minutes of history.
+    At 60-second demo cadence: 12 minutes of history.
+    """
+    from app.simulation.disaster_state import state_ring_buffer, state_to_ws_dict
+    n = min(max(1, n), 12)
+    states = state_ring_buffer.get_n(n)
+    return JSONResponse({
+        "count": len(states),
+        "states": [state_to_ws_dict(s) for s in states],
+    })
+
+
+@router.get("/predict-flood-exposure", tags=["Autonomous Loop"])
+async def get_predicted_flood_exposure():
+    """
+    Return the current Projected Flood Exposure ETA list from active state.
+    data_type: EXTRAPOLATED | projection_basis: linear_effective_runoff_persistence
+    """
+    from app.simulation.disaster_state import state_ring_buffer
+    state = state_ring_buffer.get_latest()
+    if state is None:
+        return JSONResponse({"status": "no_state", "predictions": []})
+    return JSONResponse({
+        "sequence_no": state.sequence_no,
+        "water_level_m": state.water_level_m,
+        "rainfall_rate_mm_h": state.rainfall_rate_mm_h,
+        "data_type": "EXTRAPOLATED",
+        "projection_basis": "linear_effective_runoff_persistence",
+        "predictions": [
+            {
+                "node_id": n.node_id, "lat": n.lat, "lon": n.lon,
+                "elevation_m": n.elevation_m, "eta_minutes": n.eta_minutes,
+                "risk_label": n.risk_label,
+                "data_type": n.data_type,
+                "projection_basis": n.projection_basis,
+            }
+            for n in state.predicted_flood_exposure
+        ],
+    })
+
+
+@router.get("/evacuation-advisory", tags=["Autonomous Loop"])
+async def get_evacuation_advisory():
+    """Return the current ward-level evacuation advisories from the active ActionPlan."""
+    from app.simulation.disaster_state import state_ring_buffer
+    state = state_ring_buffer.get_latest()
+    if state is None or state.action_plan is None:
+        return JSONResponse({"status": "no_state", "advisories": []})
+    from app.simulation.disaster_state import _advisory_to_dict
+    return JSONResponse({
+        "sequence_no": state.sequence_no,
+        "advisories": [_advisory_to_dict(a) for a in state.action_plan.evacuation_advisories],
+    })

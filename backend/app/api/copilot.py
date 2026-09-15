@@ -157,3 +157,94 @@ Ward Data: {json.dumps(req.ward_data)}
 
     return JSONResponse({"narrative": reply})
 
+
+# ── AMDIROS Autonomous Incident Commander Narrative ───────────────────────────
+# Called by main.py run_observation_cycle() — NOT by a user request.
+# The LLM narrates a deterministic ActionPlan. It has zero write access
+# to any operational decision or state field.
+
+IC_NARRATIVE_SYSTEM = """You are the Incident Commander AI for the Route Resilience AMDIROS platform.
+
+You receive a structured JSON snapshot of the current disaster state and produce a concise, executive Incident Commander briefing formatted as clean bullet points (under 140 words).
+
+Required format:
+• Situation: [Rainfall rate (OBSERVED), derived flood threshold (DERIVED), flooded nodes (SIMULATED)]
+• Network Impact: [Resilience Index (SIMULATED), affected wards, population at risk]
+• Healthcare Access: [Hospital reachability — explicitly name isolated facilities or state all clear]
+• Directives: [Evacuation orders (EVACUATE_NOW / EVACUATE_ADVISED), relief camps active]
+
+Rules:
+- Output the bullet points directly. Do NOT include <think> or internal reasoning tags.
+- Output clean, distinct bullet points separated by newlines. Do NOT output a single wall-of-text paragraph.
+- Report ONLY what the data says. Never invent hospitals, ward names, routes, or population numbers.
+- Label model outputs accurately: SIMULATED, EXTRAPOLATED, OBSERVED, DERIVED.
+- If a category is clear/empty, state it concisely (e.g., 'All 346 facilities reachable; zero isolated.').
+- Do NOT hallucinate.
+"""
+
+
+async def generate_incident_narrative(state) -> str:
+    """
+    Generate an LLM-narrated Incident Commander summary from a DisasterState.
+
+    This function is called by the autonomous loop ONLY for first activation
+    or HIGH-severity DecisionEvents. It is never called for MEDIUM/LOW/no-change.
+    The LLM receives the state as read-only context and returns a narrative string.
+    It has zero write access to ActionPlan or any simulation variable.
+
+    Falls back to build_template_narrative() on any failure.
+    """
+    from app.simulation.disaster_state import build_template_narrative
+
+    try:
+        plan = state.action_plan
+        isolated_hospitals = [h.name for h in state.hospital_status if not h.reachable]
+        reachable_hospitals = [h.name for h in state.hospital_status if h.reachable]
+        evac_now = []
+        evac_advised = []
+        if plan:
+            evac_now = [a.ward_name for a in plan.evacuation_advisories if a.action == "EVACUATE_NOW"]
+            evac_advised = [a.ward_name for a in plan.evacuation_advisories if a.action == "EVACUATE_ADVISED"]
+
+        disagree_reports = [
+            r for r in state.citizen_reports
+            if r.flooding_indicator and r.twin_agreement == "DISAGREES"
+        ]
+
+        context = {
+            "loop_sequence": state.sequence_no,
+            "observed_at_utc": state.observed_at,
+            "rainfall_rate_mm_h_OBSERVED": state.rainfall_rate_mm_h,
+            "derived_flood_threshold_m": state.water_level_m,
+            "flooded_node_count_SIMULATED": state.flooded_node_count,
+            "resilience_index_SIMULATED": state.resilience_index,
+            "affected_wards": state.affected_wards,
+            "population_at_risk_DERIVED": state.population_at_risk,
+            "hospitals_isolated": isolated_hospitals,
+            "hospitals_reachable_count": len(reachable_hospitals),
+            "evacuation_now_wards": evac_now,
+            "evacuation_advised_wards": evac_advised,
+            "relief_camps": len(plan.relief_camp_positions) if plan else 0,
+            "predicted_imminent_nodes_EXTRAPOLATED": len([
+                n for n in state.predicted_flood_exposure if n.risk_label == "imminent"
+            ]),
+            "citizen_reports_with_flooding": len([r for r in state.citizen_reports if r.flooding_indicator]),
+            "citizen_twin_disagreements": len(disagree_reports),
+            "loop_duration_s": state.loop_duration_s,
+            "decision_severity": state.decision_event.severity if state.decision_event else None,
+            "decision_trigger": state.decision_event.trigger_reason if state.decision_event else None,
+        }
+
+        context_msg = f"[AMDIROS DISASTER STATE SNAPSHOT]\n{json.dumps(context, indent=2)}"
+        narrative = await groq_chat(
+            system=IC_NARRATIVE_SYSTEM,
+            messages=[{"role": "user", "content": context_msg}],
+            max_tokens=600,
+        )
+        if not narrative or not narrative.strip() or narrative.startswith("Copilot is temporarily unavailable") or narrative.startswith("Copilot encountered an error"):
+            raise RuntimeError("LLM output is empty or unavailable")
+        return narrative.strip()
+
+    except Exception as exc:
+        logger.warning(f"generate_incident_narrative failed: {exc} — falling back to template.")
+        raise

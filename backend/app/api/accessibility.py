@@ -170,6 +170,17 @@ async def flood_accessibility_impact(req: FloodImpactRequest):
     All numbers are derived from graph computations and real datasets.
     No estimates are fabricated.
     """
+    try:
+        return await _flood_accessibility_impact_inner(req)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(f"flood-impact: unhandled error for {len(req.ablated_node_ids)} nodes: {exc}")
+        raise HTTPException(status_code=500, detail=f"Flood impact analysis failed: {exc}")
+
+
+async def _flood_accessibility_impact_inner(req: FloodImpactRequest):
+    """Inner implementation — called by flood_accessibility_impact with top-level error guard."""
     G = GraphStore.get_healed() or GraphStore.get_osm_fallback()
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
@@ -789,6 +800,17 @@ async def ward_report(req: WardReportRequest):
     All population figures are 2011 census values from BBMP GeoJSON,
     clearly labelled. No estimation applied.
     """
+    try:
+        return await _ward_report_inner(req)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(f"ward-report: unhandled error for {len(req.ablated_node_ids)} nodes: {exc}")
+        raise HTTPException(status_code=500, detail=f"Ward report failed: {exc}")
+
+
+async def _ward_report_inner(req: WardReportRequest):
+    """Inner implementation — called by ward_report with top-level error guard."""
     G = GraphStore.get_healed() or GraphStore.get_osm_fallback()
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
@@ -797,6 +819,7 @@ async def ward_report(req: WardReportRequest):
     flooded_nodes = [node_map[nid] for nid in req.ablated_node_ids if nid in node_map]
     if not flooded_nodes:
         raise HTTPException(status_code=400, detail="No valid flooded node IDs.")
+
 
     flooded_set = set(flooded_nodes)
 

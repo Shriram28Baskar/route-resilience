@@ -69,7 +69,7 @@ To prevent scientific overreach, this project strictly adheres to the following 
 Models the severe September 5, 2022, flooding in Bengaluru.
 *   **Observed Facts:** 131mm peak 24-hour rainfall (IMD). News archives documented flooding in areas like Koramangala.
 *   **Rainfall-Derived Output:** Standard uniform-runoff models fail for extreme localized urban events. The formula derives a water level of 877.09m, which predicts only **5** flooded nodes on the 13,000+ node graph.
-*   **Calibrated Scenario Input:** To match historical reality, the scenario water level is explicitly **calibrated** to 905m ASL to geographically encompass the documented flood extent. It is *not* a predictive meteorological output from the 131mm rainfall.
+*   **Calibrated Scenario Input:** To match historical reality, the scenario water level is explicitly **calibrated** to 905m elevation contour to geographically encompass the documented flood extent. It is *not* a predictive meteorological output from the 131mm rainfall.
 *   **Simulated Impacts:** The calibrated 905m flood extent triggers the network simulation, revealing isolated hospitals and disconnected communities.
 
 ### P2: Temporal Scenario Projection

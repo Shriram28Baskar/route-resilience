@@ -108,6 +108,50 @@ def _read_hgt(filepath: str, lat: float, lon: float) -> Optional[float]:
     return float(val) if val != -32768 else None
 
 
+def _read_hgt_bilinear(filepath: str, lat: float, lon: float) -> Optional[float]:
+    """Read a continuous elevation by bilinearly interpolating four HGT cells.
+
+    SRTM samples are integral metres, but graph nodes are not constrained to
+    sample centres.  Nearest-cell lookup creates artificial 1 m terraces that
+    make centimetre-scale runoff projections empty.  Bilinear interpolation is
+    a local, deterministic representation of the same DEM; it does not claim
+    sub-metre terrain measurement accuracy or add external data.
+    """
+    samples, tile_lat, tile_lon = _hgt_meta(filepath)
+    if not (tile_lat <= lat < tile_lat + 1 and tile_lon <= lon < tile_lon + 1):
+        return None
+
+    row_f = (tile_lat + 1 - lat) * (samples - 1)
+    col_f = (lon - tile_lon) * (samples - 1)
+    row0 = max(0, min(int(math.floor(row_f)), samples - 1))
+    col0 = max(0, min(int(math.floor(col_f)), samples - 1))
+    row1 = min(row0 + 1, samples - 1)
+    col1 = min(col0 + 1, samples - 1)
+    row_weight = row_f - row0
+    col_weight = col_f - col0
+
+    def read_sample(handle, row: int, col: int) -> Optional[float]:
+        handle.seek((row * samples + col) * 2)
+        raw = handle.read(2)
+        if len(raw) != 2:
+            return None
+        value = struct.unpack(">h", raw)[0]
+        return None if value == -32768 else float(value)
+
+    with open(filepath, "rb") as hgt:
+        northwest = read_sample(hgt, row0, col0)
+        northeast = read_sample(hgt, row0, col1)
+        southwest = read_sample(hgt, row1, col0)
+        southeast = read_sample(hgt, row1, col1)
+
+    if any(value is None for value in (northwest, northeast, southwest, southeast)):
+        return None
+
+    north = northwest * (1.0 - col_weight) + northeast * col_weight
+    south = southwest * (1.0 - col_weight) + southeast * col_weight
+    return north * (1.0 - row_weight) + south * row_weight
+
+
 def get_elevation(lat: float, lon: float) -> Tuple[Optional[float], str]:
     """
     Return (elevation_m, source_label) for a WGS84 point.
@@ -118,17 +162,18 @@ def get_elevation(lat: float, lon: float) -> Tuple[Optional[float], str]:
       'unknown'       — no HGT file covers this point
     """
     for filepath in HGT_FILES:
-        val = _read_hgt(filepath, lat, lon)
+        val = _read_hgt_bilinear(filepath, lat, lon)
         if val is not None:
             size = os.path.getsize(filepath)
-            source = "SRTMGL1_30m" if size == 25934402 else "SRTM3_90m"
+            source = "SRTMGL1_30m_bilinear" if size == 25934402 else "SRTM3_90m_bilinear"
             return val, source
     return None, "unknown"
 
 
 def initialize_elevations(G: nx.Graph) -> None:
     """
-    Stamp every node in G with 'elevation' (m) and 'elevation_source'.
+    Stamp every node in G with continuous, locally interpolated 'elevation'
+    (m) and an explicit 'elevation_source'.
 
     Called lazily on first flood simulation so it only runs once per
     graph lifetime. Subsequent calls are no-ops.
@@ -165,13 +210,39 @@ def initialize_elevations(G: nx.Graph) -> None:
         if elev is not None:
             G.nodes[n]["elevation"] = elev
             G.nodes[n]["elevation_source"] = source
+            G.nodes[n]["elevation_interpolation"] = "bilinear"
             G.nodes[n]["elevation_unknown"] = False
             ok += 1
         else:
             G.nodes[n]["elevation"] = None
             G.nodes[n]["elevation_source"] = "unknown"
             G.nodes[n]["elevation_unknown"] = True
-            missing += 1
+    # Compute local topographic sink index and depression depth:
+    for n in G.nodes():
+        z = G.nodes[n].get("elevation")
+        if z is None:
+            G.nodes[n]["local_sink_delta"] = 0.0
+            G.nodes[n]["depression_depth"] = 0.0
+            continue
+        nbrs = list(G.neighbors(n))
+        if nbrs:
+            nbr_z = [G.nodes[m].get("elevation") for m in nbrs if G.nodes[m].get("elevation") is not None]
+            if nbr_z:
+                mean_z = sum(nbr_z) / len(nbr_z)
+                G.nodes[n]["depression_depth"] = max(0.0, mean_z - z)
+            else:
+                G.nodes[n]["depression_depth"] = 0.0
+        else:
+            G.nodes[n]["depression_depth"] = 0.0
+
+        nbrs2 = set(nbrs)
+        for nbr in nbrs:
+            nbrs2.update(G.neighbors(nbr))
+        nbr_z2 = [G.nodes[m].get("elevation") for m in nbrs2 if G.nodes[m].get("elevation") is not None]
+        if nbr_z2:
+            G.nodes[n]["local_sink_delta"] = max(0.0, z - min(nbr_z2))
+        else:
+            G.nodes[n]["local_sink_delta"] = 0.0
 
     logger.info(
         f"Elevation stamping complete: {ok} nodes from HGT, {missing} nodes unknown."
@@ -198,6 +269,65 @@ def flood_ablate(G: nx.Graph, water_level: float) -> List:
     return flooded
 
 
+def flood_ablate_basin_aware(G: nx.Graph, rainfall_mm: float | dict) -> List:
+    """Return flooded node IDs using basin-aware per-watershed water levels
+    and dual-mechanism (fluvial valley accumulation + pluvial sag pooling) modeling.
+
+    Hydrological Inundation Mechanisms:
+      1. Valley Axis Accumulation (Fluvial backwater):
+         Low-lying roads near basin lake/river outlets flood as runoff converges
+         down the watershed axis: (z_n - DEM_MIN) <= valley_head(R).
+      2. Local Sag / Underpass Pooling (Pluvial flash flooding):
+         Road segments sitting in local depressions (D_n = mean_nbr_elev - z_n)
+         accumulate runoff shed from connecting road segments. Deeper sags
+         submerge at lower rainfall intensities.
+
+    Guarantees:
+      - Strict Monotonicity: Flooded(R1) ⊆ Flooded(R2) for R1 < R2.
+      - 100% Cross-basin isolation: rain=0 in a basin causes exactly 0 flooded nodes.
+    """
+    from app.data.backtest import (
+        assign_basin, BASINS, initialize_basin_mins,
+        URBAN_RUNOFF_COEFFICIENT,
+    )
+
+    initialize_elevations(G)
+    initialize_basin_mins(G)
+
+    flooded = []
+    for n, data in G.nodes(data=True):
+        elev = data.get("elevation")
+        if elev is None:
+            continue
+        lat = data.get("y")
+        lon = data.get("x")
+        if lat is None or lon is None:
+            continue
+        basin_id = assign_basin(lat, lon)
+        rain_val = (
+            rainfall_mm.get(basin_id, 0.0)
+            if isinstance(rainfall_mm, dict)
+            else float(rainfall_mm)
+        )
+        if rain_val <= 0.0:
+            continue
+
+        dem_min = BASINS[basin_id]["dem_min_m"]
+        eff_runoff_m = (rain_val * URBAN_RUNOFF_COEFFICIENT) / 1000.0
+        valley_head = eff_runoff_m * 6.0
+        req_dep = max(0.2, 6.0 - (rain_val ** 0.45) * 0.6)
+
+        # Mechanism 1: Fluvial / valley backwater near lake/channel outlet
+        if (elev - dem_min) <= valley_head:
+            flooded.append(n)
+        # Mechanism 2: Pluvial sag / underpass accumulation across urban terrain
+        elif data.get("depression_depth", 0.0) >= req_dep:
+            flooded.append(n)
+
+    return flooded
+
+
+
 def get_elevation_bounds(G: nx.Graph) -> dict:
     """
     Return {min, max, mean, unknown_count} elevation stats across all graph nodes.
@@ -218,4 +348,3 @@ def get_elevation_bounds(G: nx.Graph) -> dict:
         "mean": round(sum(known) / len(known), 1),
         "unknown_count": unknown_count,
     }
-

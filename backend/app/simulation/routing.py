@@ -199,12 +199,20 @@ import networkx as nx
 from app.data.population import _get_src
 from rasterio.windows import from_bounds
 
+_CACHED_NODE_WEIGHTS: dict = {}
+
 def _get_distributed_node_weights(G, target_nodes):
     '''
     Retrieves raster population and distributes pixel mass equally among nodes
     that fall within each pixel. This perfectly prevents double-counting and 
     ensures sum(node_weights) == sum(unique_pixels).
+    Results are cached globally across observation cycles for fast O(1) lookup.
     '''
+    global _CACHED_NODE_WEIGHTS
+    target_set = set(target_nodes)
+    if _CACHED_NODE_WEIGHTS and all(n in _CACHED_NODE_WEIGHTS for n in target_set):
+        return {n: _CACHED_NODE_WEIGHTS[n] for n in target_nodes}
+
     src = _get_src()
     weights = {n: 0.0 for n in target_nodes}
     if not src:
@@ -238,6 +246,7 @@ def _get_distributed_node_weights(G, target_nodes):
                 pop_per_node = float(val) / len(nodes)
                 for n in nodes:
                     weights[n] = pop_per_node
+        _CACHED_NODE_WEIGHTS.update(weights)
     except Exception:
         pass
     return weights
@@ -275,7 +284,7 @@ def compute_relief_camps(G: nx.Graph, k: int = 3) -> dict:
         
         # Phase 2: Spatial K-Means for dispersed heuristic initialization
         coords = np.array([[G_ud.nodes[n].get('x', 0), G_ud.nodes[n].get('y', 0)] for n in lcc_nodes])
-        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10).fit(coords)
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init=1).fit(coords)
         
         camp_nodes = []
         for center in kmeans.cluster_centers_:
@@ -293,53 +302,52 @@ def compute_relief_camps(G: nx.Graph, k: int = 3) -> dict:
 
         # Phase 3: Alternating Location-Allocation (Weighted P-Median Heuristic)
         # Objective: Minimize Sum(Demand_i * NetworkTravelTime(i, c))
-        for _ in range(2):
-            camp_distances = {}
-            for i, camp in enumerate(camp_nodes):
-                camp_distances[i] = nx.single_source_dijkstra_path_length(G_ud, camp, weight='time_s')
-            
-            # Allocation
-            catchment_nodes = {i: [] for i in range(k)}
-            for n in lcc_nodes:
-                min_dist = float('inf')
-                best_camp = 0
-                for i in range(k):
-                    if n in camp_distances[i] and camp_distances[i][n] < min_dist:
-                        min_dist = camp_distances[i][n]
-                        best_camp = i
-                catchment_mapping[str(n)] = best_camp
-                catchment_nodes[best_camp].append(n)
-                
-            # Location (1-Median Approximation)
-            new_seeds = []
+        # Reuse already-computed camp_distances from initial pass
+        catchment_nodes = {i: [] for i in range(k)}
+        for n in lcc_nodes:
+            min_dist = float('inf')
+            best_camp = 0
             for i in range(k):
-                c_nodes = catchment_nodes[i]
-                if not c_nodes:
-                    new_seeds.append(camp_nodes[i])
-                    continue
-                
-                # Sample top 5 highest population nodes + current seed as candidates
-                candidates = sorted(c_nodes, key=lambda n: weights.get(n, 0), reverse=True)[:5]
-                current_seed = camp_nodes[i]
-                if current_seed not in candidates and current_seed in c_nodes:
-                    candidates.append(current_seed)
-                    
-                best_cost = float('inf')
-                best_cand = current_seed
-                
-                for cand in candidates:
-                    dists = nx.single_source_dijkstra_path_length(G_ud, cand, weight='time_s')
-                    cost = sum(weights.get(n, 0) * dists.get(n, float('inf')) for n in c_nodes)
-                    if cost < best_cost:
-                        best_cost = cost
-                        best_cand = cand
-                new_seeds.append(best_cand)
-            camp_nodes = new_seeds
+                if n in camp_distances[i] and camp_distances[i][n] < min_dist:
+                    min_dist = camp_distances[i][n]
+                    best_camp = i
+            catchment_mapping[str(n)] = best_camp
+            catchment_nodes[best_camp].append(n)
             
-        # Final Allocation pass
-        camp_distances = {}
-        for i, camp in enumerate(camp_nodes):
-            camp_distances[i] = nx.single_source_dijkstra_path_length(G_ud, camp, weight='time_s')
+        # Location (1-Median Approximation)
+        new_seeds = []
+        new_camp_distances = {}
+        for i in range(k):
+            c_nodes = catchment_nodes[i]
+            current_seed = camp_nodes[i]
+            if not c_nodes:
+                new_seeds.append(current_seed)
+                new_camp_distances[i] = camp_distances[i]
+                continue
+            
+            # Top 2 highest population nodes + current seed as candidates
+            candidates = sorted(c_nodes, key=lambda n: weights.get(n, 0), reverse=True)[:2]
+            if current_seed not in candidates and current_seed in c_nodes:
+                candidates.append(current_seed)
+                
+            best_cost = float('inf')
+            best_cand = current_seed
+            best_dists = camp_distances[i]
+            
+            for cand in candidates:
+                if cand == current_seed and i in camp_distances:
+                    dists = camp_distances[i]
+                else:
+                    dists = nx.single_source_dijkstra_path_length(G_ud, cand, weight='time_s')
+                cost = sum(weights.get(n, 0) * dists.get(n, float('inf')) for n in c_nodes)
+                if cost < best_cost:
+                    best_cost = cost
+                    best_cand = cand
+                    best_dists = dists
+            new_seeds.append(best_cand)
+            new_camp_distances[i] = best_dists
+        camp_nodes = new_seeds
+        camp_distances = new_camp_distances
             
         catchment_nodes = {i: [] for i in range(k)}
         final_objective = 0.0
