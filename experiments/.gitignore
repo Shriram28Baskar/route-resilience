@@ -1,3 +1,11 @@
-# Raw outputs are committed only when their run has COMPLETED. A truncated
-# JSONL is indistinguishable from a finished one once it is in git history.
+# Run logs are noise; the JSON/JSONL outputs carry the results.
 results/*.log
+
+# Raw experiment outputs are IGNORED WHILE IN FLIGHT and committed with
+# `git add -f` only once their run has finished. A truncated JSONL is
+# indistinguishable from a complete one once it is in git history, and a
+# partial experiment file is exactly the kind of artifact that gets cited
+# later as if it were the full run.
+#
+# On completion:  git add -f experiments/results/interventions_raw*.jsonl
+results/interventions_raw*.jsonl
