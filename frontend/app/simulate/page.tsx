@@ -1256,11 +1256,9 @@ function CascadeResults({ result, totalNodes }: { result: { seed_nodes?: string[
             <div className="text-[#FFB400] font-bold mb-1">⚠ Cascade Truncated at Iteration Limit</div>
             <div className="text-xs text-[#9CA3AF]">Simulation stopped after {steps.length} iterations. Cascade propagation was still active.</div>
             <div className="text-[10px] text-white/50 mt-2 p-2 bg-white/5 rounded border border-white/10">
-              Maximum iterations configured: 15<br/>
-              Safety limit to prevent infinite propagation loops.
-            </div>
-            <div className="text-[10px] text-[#FFB400] mt-2 p-2 bg-[#FFB400]/10 rounded border border-[#FFB400]/20">
-              <span className="font-bold">Estimated remaining cascade:</span> {Math.max(2, Math.round((lastStep?.newly_stressed?.length || 0) * 0.4))}–{Math.max(4, Math.round((lastStep?.newly_stressed?.length || 0) * 0.8))} additional failures (Confidence: 78%)
+              Iterations run: {steps.length}. Stress threshold and dampening factor are
+              returned per step by the API; no extrapolation beyond the last measured
+              iteration is shown.
             </div>
           </div>
         ) : (
@@ -1471,18 +1469,18 @@ function RouteResults({ result, activeRoute, setActiveRoute }: { result: any, ac
       {/* Critical Infrastructure Destroyed */}
       {result.ablated_infra?.length > 0 && (
         <div className="bg-[#111827] border border-[#FF4444]/30 rounded-xl p-5">
-          <div className="text-[10px] text-[#FF4444] uppercase tracking-widest mb-3">⛔ Critical Infrastructure Destroyed</div>
+          <div className="text-[10px] text-[#FF4444] uppercase tracking-widest mb-3">⛔ Ablated Nodes</div>
           <div className="space-y-1.5">
             {result.ablated_infra.map((inf: any) => (
               <div key={inf.node_id} className="flex items-center justify-between text-xs">
-                <span className="text-white">{inf.type}</span>
+                <span className="text-white">{inf.resolved === false ? "not found in graph" : "removed"}</span>
                 <span className="font-mono text-[#6B7280] bg-black/30 px-2 py-0.5 rounded">#{inf.node_id}</span>
               </div>
             ))}
           </div>
           <div className="mt-3 pt-3 border-t border-white/8 grid grid-cols-2 gap-3 text-[10px]">
             <div><div className="text-[#6B7280]">Nodes Removed</div><div className="text-[#FF4444] font-bold text-sm">{result.ablated_infra.length}</div></div>
-            <div><div className="text-[#6B7280]">Routes Blocked</div><div className="text-[#FF4444] font-bold text-sm">{result.ablated_infra.length * 3}</div></div>
+            <div><div className="text-[#6B7280]">Comparison</div><div className="text-[#FF4444] font-bold text-sm">{result.comparison_status ?? "—"}</div></div>
           </div>
           {result.delta_distance_m != null && result.delta_time_s != null && (
             <div className="mt-4 pt-3 border-t border-white/8 text-center">

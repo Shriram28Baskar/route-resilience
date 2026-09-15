@@ -3,6 +3,7 @@ Route Resilience — FastAPI backend entrypoint.
 Mounts all sub-routers and configures CORS, lifespan, and logging.
 """
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -12,8 +13,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import segmentation, graph, simulation, accessibility, copilot, reports, bhuvan
+from app.api import graph, simulation, accessibility, copilot, reports, bhuvan
 from app.graph_pipeline.graph_build import GraphStore
+
+# The segmentation / Grad-CAM routers pull in torch, torchvision and PIL. They are
+# not required by the graph-resilience engine, so they are opt-in. Default: off.
+ENABLE_ML = os.getenv("ENABLE_ML", "false").strip().lower() in ("1", "true", "yes")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -76,7 +81,13 @@ app.add_middleware(
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-app.include_router(segmentation.router, prefix="/segment",    tags=["Segmentation"])
+if ENABLE_ML:
+    from app.api import segmentation  # noqa: E402  (optional heavy deps)
+    app.include_router(segmentation.router, prefix="/segment", tags=["Segmentation"])
+    logger.info("ENABLE_ML=true — segmentation router mounted.")
+else:
+    logger.info("ENABLE_ML=false — segmentation router NOT mounted (no torch/PIL required).")
+
 app.include_router(graph.router,        prefix="/graph",       tags=["Graph"])
 app.include_router(simulation.router,   prefix="/simulate",    tags=["Simulation"])
 app.include_router(accessibility.router,prefix="/accessibility",tags=["Accessibility"])

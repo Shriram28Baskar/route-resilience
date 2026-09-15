@@ -39,16 +39,45 @@ import weakref
 
 _baseline_cache = weakref.WeakKeyDictionary()
 
+# Default penalty (seconds) charged for an origin-destination pair that was
+# reachable in the baseline and is unreachable after perturbation.
+#
+# This value is ARBITRARY. It is not derived from data. It exists because the
+# alternative (dropping unreachable pairs) makes a severed network appear to
+# IMPROVE. Every RI produced by this module is conditional on it, so it is an
+# explicit parameter, it is echoed in the result, and its effect on intervention
+# rankings must be checked with a sensitivity sweep before any RI is published.
+DEFAULT_PENALTY_S: float = 3600.0
+
+
 def compute_resilience_index(
     baseline_G: nx.Graph,
     perturbed_G: nx.Graph,
     sample_size: int = 60,
+    penalty_s: float = DEFAULT_PENALTY_S,
 ) -> Dict[str, Any]:
     """
-    Compute Resilience Index using deterministic sampling and disconnection penalties.
+    Compute the Resilience Index and its penalty-free decomposition.
+
+    RI = baseline_mean_path_time / perturbed_mean_path_time, where pairs that
+    became unreachable are charged `penalty_s`.
+
+    RI is BOUNDED BELOW by baseline_mean / penalty_s. That floor is a function of
+    the network's own baseline path times, so **RI is not comparable across
+    networks**. For any cross-network claim use the two penalty-free quantities
+    returned alongside it:
+
+      * ``unreachable_fraction``  - share of baseline-reachable pairs severed.
+      * ``reachable_path_inflation`` - mean path-time ratio computed ONLY over
+        pairs reachable in both graphs. Independent of `penalty_s`.
+
+    Together these fully characterise the damage without an arbitrary constant.
+    No single normalised scalar is offered: collapsing "longer" and "impossible"
+    into one number requires a weighting between them that this module has no
+    principled basis to choose.
     """
     import random
-    
+
     # 1. Deterministic sample of nodes from the baseline graph
     nodes = sorted(list(baseline_G.nodes()))
     rng = random.Random(999) # Use different seed from simulation's Random Failure!
@@ -63,10 +92,13 @@ def compute_resilience_index(
             _baseline_cache[baseline_G] = {}
         _baseline_cache[baseline_G][sample_size] = (baseline_avg, baseline_counts)
 
-    # 3. Compute perturbed with penalties
-    perturbed_avg = _compute_perturbed_paths(perturbed_G, sources, baseline_counts)
+    # 3. Compute perturbed with penalties, plus the penalty-free decomposition
+    perturbed_avg, decomp = _compute_perturbed_paths(
+        perturbed_G, sources, baseline_counts, penalty_s, baseline_G
+    )
 
-    is_disconnected = not nx.is_connected(perturbed_G)
+    is_disconnected = (perturbed_G.number_of_nodes() > 0
+                       and not nx.is_connected(perturbed_G))
     partition_count = nx.number_connected_components(perturbed_G)
 
     if baseline_avg is not None and perturbed_avg is not None and perturbed_avg > 0:
@@ -74,8 +106,10 @@ def compute_resilience_index(
     else:
         ri = None
 
+    ri_floor = (baseline_avg / penalty_s) if (baseline_avg is not None and penalty_s > 0) else None
+
     logger.info(f"Resilience Index: R={ri}, baseline={baseline_avg}, perturbed={perturbed_avg}, "
-                f"disconnected={is_disconnected}")
+                f"penalty_s={penalty_s}, disconnected={is_disconnected}")
 
     return {
         "resilience_index": round(ri, 4) if ri is not None else None,
@@ -83,48 +117,91 @@ def compute_resilience_index(
         "perturbed_avg_path": round(perturbed_avg, 4) if perturbed_avg is not None else None,
         "disconnected": is_disconnected,
         "partition_count": partition_count,
+        # --- provenance of the metric -------------------------------------
+        "penalty_s": penalty_s,
+        "sample_size": sample_size,
+        "ri_floor": round(ri_floor, 6) if ri_floor is not None else None,
+        "ri_is_cross_network_comparable": False,
+        # --- penalty-free decomposition ------------------------------------
+        "unreachable_fraction": decomp["unreachable_fraction"],
+        "reachable_path_inflation": decomp["reachable_path_inflation"],
+        "pairs_evaluated": decomp["pairs_evaluated"],
+        "pairs_severed": decomp["pairs_severed"],
     }
 
 
 def _compute_baseline_paths(G: nx.Graph, sources: list):
+    """Return (mean_baseline_path_time, {src: {tgt: time}}) over the sampled sources."""
     lengths = []
-    reachable_counts = {}
+    reachable_map = {}
     for src in sources:
         if src not in G:
+            reachable_map[src] = {}
             continue
         try:
             path_lengths = nx.single_source_dijkstra_path_length(G, src, weight="time_s")
-            reachable = [v for v in path_lengths.values() if v > 0]
-            lengths.extend(reachable)
-            reachable_counts[src] = len(reachable)
+            reachable = {t: d for t, d in path_lengths.items() if d > 0}
+            lengths.extend(reachable.values())
+            reachable_map[src] = reachable
         except Exception:
-            reachable_counts[src] = 0
-            
+            reachable_map[src] = {}
+
     avg = sum(lengths) / len(lengths) if lengths else None
-    return avg, reachable_counts
+    return avg, reachable_map
 
-def _compute_perturbed_paths(G: nx.Graph, sources: list, baseline_counts: dict):
+
+def _compute_perturbed_paths(G: nx.Graph, sources: list, baseline_map: dict,
+                             penalty_s: float, baseline_G: nx.Graph = None):
+    """
+    Mean perturbed path time with `penalty_s` charged for severed pairs, plus a
+    penalty-free decomposition computed over the same sampled pairs.
+
+    Returns (mean_perturbed_path_time, decomposition_dict).
+    """
     lengths = []
-    # Use 3600 seconds (1 hour) as the penalty for a broken/unreachable path
-    PENALTY = 3600.0 
-    
+    pairs_total = 0          # baseline-reachable pairs considered
+    pairs_severed = 0        # of those, now unreachable
+    both_base, both_pert = [], []   # matched pairs reachable in BOTH graphs
+
     for src in sources:
-        expected = baseline_counts.get(src, 0)
+        expected = baseline_map.get(src, {})
+        pairs_total += len(expected)
+
         if src not in G:
-            # Source ablated! All its previous paths are broken.
-            lengths.extend([PENALTY] * expected)
+            # Source itself ablated: every pair it had is severed.
+            lengths.extend([penalty_s] * len(expected))
+            pairs_severed += len(expected)
             continue
-            
+
         try:
             path_lengths = nx.single_source_dijkstra_path_length(G, src, weight="time_s")
-            reachable = [v for v in path_lengths.values() if v > 0]
-            lengths.extend(reachable)
-            
-            # Penalize missing destinations
-            missing = expected - len(reachable)
-            if missing > 0:
-                lengths.extend([PENALTY] * missing)
+            reachable = {t: d for t, d in path_lengths.items() if d > 0}
         except Exception:
-            lengths.extend([PENALTY] * expected)
+            lengths.extend([penalty_s] * len(expected))
+            pairs_severed += len(expected)
+            continue
 
-    return sum(lengths) / len(lengths) if lengths else None
+        for tgt, base_d in expected.items():
+            if tgt in reachable:
+                lengths.append(reachable[tgt])
+                both_base.append(base_d)
+                both_pert.append(reachable[tgt])
+            else:
+                lengths.append(penalty_s)
+                pairs_severed += 1
+
+    mean_perturbed = sum(lengths) / len(lengths) if lengths else None
+
+    inflation = None
+    if both_base and sum(both_base) > 0:
+        inflation = round((sum(both_pert) / len(both_pert)) /
+                          (sum(both_base) / len(both_base)), 6)
+
+    decomposition = {
+        "unreachable_fraction": (round(pairs_severed / pairs_total, 6)
+                                 if pairs_total else None),
+        "reachable_path_inflation": inflation,
+        "pairs_evaluated": pairs_total,
+        "pairs_severed": pairs_severed,
+    }
+    return mean_perturbed, decomposition

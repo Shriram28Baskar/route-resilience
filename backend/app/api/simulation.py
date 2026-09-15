@@ -275,12 +275,7 @@ def ablate_compare(req: CompareRequest):
     rand_targets = _random.sample(all_nodes, n)
     G_rand = ablate_nodes(G, rand_targets)
     ri_rand = compute_resilience_index(G, G_rand)
-    
-    # Enforce realistic scaling: Random failure should cause less damage than targeted betweenness attacks
-    if ri_bc["resilience_index"] is not None and ri_rand["resilience_index"] is not None:
-        if ri_rand["resilience_index"] <= ri_bc["resilience_index"]:
-            ri_rand["resilience_index"] = min(0.98, ri_bc["resilience_index"] + 0.05)
-            
+
     results.append({
         "strategy": "Random Failure",
         "color": "#6B7280",
@@ -294,26 +289,40 @@ def ablate_compare(req: CompareRequest):
     # Baseline (no ablation)
     baseline_path = compute_resilience_index(G, G)["baseline_avg_path"]
 
-    # Winner: strategy with lowest resilience (most impactful disaster)
+    # Most impactful strategy = lowest resilience index. The label reports the measured
+    # ratio of connectivity loss relative to the random-failure control, in whichever
+    # direction the measurement falls. No result is suppressed or rescaled.
     scored = [r for r in results if r["resilience_index"] is not None]
     worst = min(scored, key=lambda x: x["resilience_index"]) if scored else None
-    if worst and ri_rand["resilience_index"]:
+    ri_rand_value = ri_rand["resilience_index"]
+    if worst is not None and ri_rand_value is not None:
+        drop_rand = 1.0 - ri_rand_value
+        drop_worst = 1.0 - worst["resilience_index"]
         if worst["strategy"] == "Random Failure":
-            worst["winner_label"] = "Random failure is as destructive as targeted attacks in this scenario"
-        else:
-            drop_rand = 1.0 - ri_rand["resilience_index"]
-            drop_worst = 1.0 - worst["resilience_index"]
-            if drop_rand > 0.001:
-                multiple = round(drop_worst / drop_rand, 1)
-                strat_name = worst['strategy'].lower().split()[0]
-                if multiple <= 1.1:
-                    worst["winner_label"] = "At this attack scale, targeted and random failures produce similar impact."
-                elif strat_name == "degree":
-                    worst["winner_label"] = f"Degree-based attacks are {multiple}× more damaging than random failures."
-                else:
-                    worst["winner_label"] = f"Targeted attacks on critical junctions cause {multiple}× greater network degradation than random failures."
+            targeted = [r for r in scored if r["strategy"] != "Random Failure"]
+            best_targeted = min(targeted, key=lambda x: x["resilience_index"]) if targeted else None
+            if best_targeted is not None and (1.0 - best_targeted["resilience_index"]) > 1e-9:
+                ratio = round(drop_rand / (1.0 - best_targeted["resilience_index"]), 2)
+                worst["winner_label"] = (
+                    f"Measured: random failure caused {ratio}× the connectivity loss of the "
+                    f"strongest targeted strategy ({best_targeted['strategy']}) at n={n}. "
+                    f"Targeted attack did NOT dominate on this network."
+                )
             else:
-                worst["winner_label"] = f"Targeted {worst['strategy']} attacks cause substantially greater network degradation than random failures."
+                worst["winner_label"] = (
+                    f"Measured: random failure was the most damaging strategy at n={n}."
+                )
+        elif drop_rand > 1e-9:
+            ratio = round(drop_worst / drop_rand, 2)
+            worst["winner_label"] = (
+                f"Measured: {worst['strategy']} caused {ratio}× the connectivity loss of "
+                f"random failure at n={n}."
+            )
+        else:
+            worst["winner_label"] = (
+                f"Measured: random failure produced no detectable connectivity loss at n={n}; "
+                f"ratio undefined."
+            )
 
     return JSONResponse({
         "strategies": results,
@@ -383,13 +392,11 @@ def ablate_prescribe(req: PrescribeRequest):
             G_hardened_perturbed = ablate_nodes(G_hardened, target_nodes)
             ri_validated = compute_resilience_index(G, G_hardened_perturbed)
             validated_ri = round(ri_validated.get("resilience_index") or 0.0, 4)
-            
-            # Ensure mathematical consistency for demonstration: hardened network must have higher RI
-            if validated_ri <= attacked_ri:
-                validated_ri = min(0.99, attacked_ri + 0.025)
 
+            # A counterfactual validation that cannot fail is not a validation.
+            # The measured value is reported as-is, including when the intervention
+            # does not help (gain <= 0).
             gain_from_attacked = round(validated_ri - attacked_ri, 4)
-            gain_from_baseline = round(validated_ri - attacked_ri, 4)
 
             isolated_count = len(comp_b)
             suggestions.append({
@@ -406,7 +413,12 @@ def ablate_prescribe(req: PrescribeRequest):
                 "new_resilience_index": validated_ri,
                 "rationale": f"Reconnects isolated zone of {isolated_count:,} nodes to main network",
                 "isolated_nodes": isolated_count,
-                "priority": "CRITICAL" if gain_from_attacked > 0.02 else "HIGH",
+                "priority": ("CRITICAL" if gain_from_attacked > 0.02
+                             else "HIGH" if gain_from_attacked > 0.0
+                             else "NO_MEASURED_BENEFIT"),
+                "validation_outcome": ("improves" if gain_from_attacked > 0.0
+                                       else "no_change" if gain_from_attacked == 0.0
+                                       else "degrades"),
                 "cost_estimate": "Medium — requires 1 road bridge or bypass",
             })
     else:
@@ -440,7 +452,12 @@ def ablate_prescribe(req: PrescribeRequest):
                     "new_resilience_index": validated_ri,
                     "rationale": f"Adds redundant path around single-point-of-failure node #{ap}",
                     "isolated_nodes": 1,
-                    "priority": "HIGH",
+                    "priority": ("CRITICAL" if gain > 0.02
+                                 else "HIGH" if gain > 0.0
+                                 else "NO_MEASURED_BENEFIT"),
+                    "validation_outcome": ("improves" if gain > 0.0
+                                           else "no_change" if gain == 0.0
+                                           else "degrades"),
                     "cost_estimate": "Low — parallel road or pedestrian bridge",
                 })
             if len(suggestions) >= req.max_recommendations:
@@ -575,52 +592,48 @@ def route(req: RouteRequest):
     if req.ablated_node_ids:
         ablated_nodes = [node_map[nid] for nid in req.ablated_node_ids if nid in node_map]
 
-        # Deterministic infrastructure category tags for UI display
-        infra_types = [
-            "🚩 Critical Junction",
-            "🏥 Hospital Access",
-            "🚒 Fire Station Access",
-            "👮 Police Station Access",
-            "🏠 Residential Access",
+        # Only the node IDs the caller actually ablated are reported. No inferred
+        # infrastructure category is attached: the graph carries no facility tags,
+        # so any such label would be fabricated.
+        result["ablated_infra"] = [
+            {"node_id": nid, "resolved": nid in node_map}
+            for nid in req.ablated_node_ids[:10]
         ]
-        ablated_infra = [
-            {"node_id": nid, "type": infra_types[i % len(infra_types)]}
-            for i, nid in enumerate(req.ablated_node_ids[:10])
-        ]
-        result["ablated_infra"] = ablated_infra
+        result["ablated_unresolved_count"] = len(
+            [nid for nid in req.ablated_node_ids if nid not in node_map]
+        )
 
         perturbed = ablate_nodes(G, ablated_nodes)
         rerouted = compute_route(perturbed, src, tgt, weight_type=req.weight_type, num_alternatives=2)
         result["rerouted"] = rerouted
 
-        if baseline.get("distance_m") is not None and rerouted.get("distance_m") is not None:
-            bd, rd = baseline["distance_m"], rerouted["distance_m"]
-            
-            # HACKATHON DEMO GUARDRAIL:
-            # If the selected disaster didn't impact the route (rd == bd), we forcefully ablate
-            # a node directly on the path so the judges ALWAYS see a dynamic reroute in action.
-            if bd == rd and len(baseline.get("path_nodes", [])) > 3:
-                mid_node_str = baseline["path_nodes"][len(baseline["path_nodes"]) // 2]
-                if mid_node_str in node_map:
-                    forced_node = node_map[mid_node_str]
-                    ablated_nodes.append(forced_node)
-                    result["ablated_infra"].append({"node_id": mid_node_str, "type": "💥 Direct Route Failure"})
-                    
-                    # Re-compute with the forced failure
-                    perturbed = ablate_nodes(G, ablated_nodes)
-                    rerouted = compute_route(perturbed, src, tgt, weight_type=req.weight_type, num_alternatives=2)
-                    result["rerouted"] = rerouted
-                    rd = rerouted.get("distance_m", rd)
+        bd = baseline.get("distance_m")
+        rd = rerouted.get("distance_m")
 
+        if bd is None:
+            # No baseline path existed even before the ablation.
+            result["comparison_status"] = "baseline_unreachable"
+        elif rd is None:
+            # The ablation severed the origin–destination pair. This is a valid,
+            # meaningful outcome — not an error and not a value to substitute.
+            result["comparison_status"] = "severed_by_ablation"
+            result["rerouted_reachable"] = False
+            result["severed_reason"] = rerouted.get("reason")
+        else:
+            result["comparison_status"] = "comparable"
+            result["rerouted_reachable"] = True
             bt, rt = baseline["travel_time_s"], rerouted["travel_time_s"]
             bn, rn = len(baseline["path_nodes"]), len(rerouted["path_nodes"])
-            
+
             result["delta_distance_m"] = round(rd - bd, 2)
-            result["delta_time_s"] = round(rt - bt, 2)
             result["delta_distance_pct"] = round((rd - bd) / bd * 100, 1) if bd else None
-            result["delta_time_pct"] = round((rt - bt) / bt * 100, 1) if bt else None
             result["delta_nodes"] = rn - bn
             result["delta_nodes_pct"] = round((rn - bn) / bn * 100, 1) if bn else None
+            if bt is not None and rt is not None:
+                result["delta_time_s"] = round(rt - bt, 2)
+                result["delta_time_pct"] = round((rt - bt) / bt * 100, 1) if bt else None
+    else:
+        result["comparison_status"] = "no_ablation_requested"
 
     return JSONResponse(result)
 

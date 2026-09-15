@@ -22,7 +22,14 @@ AOI_EAST  = float(os.getenv("AOI_EAST",  77.64))
 # ── Graph Store ───────────────────────────────────────────────────────────────
 
 class GraphStore:
+    # _raw / _ml_healed hold graphs derived from the ML segmentation pipeline.
+    # They are DELIBERATELY not readable by the simulation endpoints: a skeleton
+    # graph carries pixel-derived coordinates linearly stretched over the AOI
+    # bounding box, so letting it replace the city graph silently invalidates the
+    # geospatial basis of every downstream result.
     _raw:             Optional[nx.Graph] = None
+    _ml_healed:       Optional[nx.Graph] = None
+    # _healed is the analysis graph. Nothing in the ML path may write it.
     _healed:          Optional[nx.Graph] = None
     _osm_fallback:    Optional[nx.Graph] = None
     _last_simulation: Optional[Dict]     = None
@@ -46,7 +53,17 @@ class GraphStore:
 
     @classmethod
     def set_healed(cls, G: nx.Graph):
+        """Set the analysis graph. Not reachable from the ML/segmentation path."""
         cls._healed = G
+
+    @classmethod
+    def set_ml_healed(cls, G: nx.Graph):
+        """Store an ML-derived healed graph WITHOUT affecting simulation state."""
+        cls._ml_healed = G
+
+    @classmethod
+    def get_ml_healed(cls) -> Optional[nx.Graph]:
+        return cls._ml_healed
 
     @classmethod
     def get_healed(cls) -> Optional[nx.Graph]:

@@ -12,12 +12,12 @@ import base64
 import logging
 from typing import Optional
 
-import numpy as np
 from fastapi import APIRouter, HTTPException, Body, Response
 from fastapi.responses import JSONResponse
-from PIL import Image
 
-from app.graph_pipeline.skeletonize import mask_to_skeleton
+# numpy / PIL / scikit-image are only needed by /graph/build (raster mask decoding).
+# They are imported lazily so the graph-resilience endpoints do not require the
+# raster stack to be installed.
 from app.graph_pipeline.graph_build import GraphStore, skeleton_to_graph, graph_to_geojson
 from app.graph_pipeline.mst_healing import heal_graph
 from app.graph_pipeline.centrality import compute_betweenness
@@ -36,6 +36,16 @@ def build_graph(payload: dict = Body(...)):
     mask_b64 = payload.get("mask_b64")
     if not mask_b64:
         raise HTTPException(status_code=400, detail="mask_b64 is required")
+
+    try:
+        import numpy as np
+        from PIL import Image
+        from app.graph_pipeline.skeletonize import mask_to_skeleton
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Raster stack not installed (numpy/pillow/scikit-image): {exc}",
+        )
 
     try:
         mask_bytes = base64.b64decode(mask_b64)
@@ -70,7 +80,10 @@ def heal_road_graph():
         raise HTTPException(status_code=400, detail="No raw graph available. Call /graph/build first.")
 
     healed = heal_graph(raw)
-    GraphStore.set_healed(healed)
+    # Quarantined: writes the ML-derived slot only. Previously this replaced the
+    # global analysis graph, so uploading any tile on /explain silently changed
+    # the network every other endpoint was analysing.
+    GraphStore.set_ml_healed(healed)
 
     raw_metrics = compute_graph_metrics(raw)
     healed_metrics = compute_graph_metrics(healed)
