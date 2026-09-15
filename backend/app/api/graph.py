@@ -22,6 +22,8 @@ from app.graph_pipeline.graph_build import GraphStore, skeleton_to_graph, graph_
 from app.graph_pipeline.mst_healing import heal_graph
 from app.graph_pipeline.centrality import compute_betweenness
 from app.graph_pipeline.metrics import compute_graph_metrics
+from app.graph_pipeline.fingerprint import describe_graph_source
+from app.provenance import Provenance, MEASURED, graph_input, with_provenance
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -112,7 +114,8 @@ def graph_metrics(use_healed: bool = True):
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
 
-    return JSONResponse(compute_graph_metrics(G))
+    _p = Provenance(status=MEASURED); _p.inputs.append(graph_input(G))
+    return JSONResponse(with_provenance(compute_graph_metrics(G), _p))
 
 
 @router.get("/centrality")
@@ -133,10 +136,15 @@ def graph_centrality(top_n: Optional[int] = 20, k: Optional[int] = 50):
     ]
     all_scores = {str(nid): score for nid, score in centrality.items()}
 
+    _p = Provenance(status=MEASURED)
+    _p.inputs.append(graph_input(G))
+    _p.assume("betweenness is k-sample approximated (Brandes, seed 42) above 500 "
+              "nodes and renormalised so the maximum equals 1.0")
     content = json.dumps({
         "gatekeepers": gatekeepers,
         "all_centrality": all_scores,
         "top_n": top_n,
+        "data_provenance": _p.to_dict(),
     })
     return Response(content=content, media_type="application/json")
 
@@ -155,6 +163,15 @@ def graph_criticality(top_n: Optional[int] = 20, k: Optional[int] = 50):
     # For massive graphs (like the fallback), use a much smaller k to prevent timeouts
     n = G.number_of_nodes()
     effective_k = min(k, 5) if n > 5000 else k
+
+    _p = Provenance(status=MEASURED)
+    _p.inputs.append(graph_input(G))
+    _p.assume(f"betweenness/edge-betweenness sampled with k={effective_k} pivots "
+              f"(requested k={k}); above 5000 nodes k is capped at 5 for latency, "
+              f"which materially widens the approximation error")
+    if n > 5000 and k > 5:
+        _p.note(f"k was reduced from {k} to {effective_k} because the graph has "
+                f"{n} nodes. Rankings from a 5-pivot sample are indicative only.")
 
     # 1. Betweenness
     betweenness = compute_betweenness(G, k=effective_k)
@@ -184,7 +201,8 @@ def graph_criticality(top_n: Optional[int] = 20, k: Optional[int] = 50):
         "closeness": {str(nid): score for nid, score in closeness.items()},
         "gatekeepers": gatekeepers,
         "articulation_points": [str(nid) for nid in aps],
-        "critical_edges": critical_edges
+        "critical_edges": critical_edges,
+        "data_provenance": _p.to_dict(),
     })
     return Response(content=content, media_type="application/json")
 
@@ -201,3 +219,33 @@ def graph_geojson():
     geojson = graph_to_geojson(G)
     content = json.dumps(geojson)
     return Response(content=content, media_type="application/json")
+
+
+@router.get("/source")
+def graph_source():
+    """
+    State exactly which graph artifact is being analysed.
+
+    Returns the AOI bbox, the osmnx version and download timestamp that produced
+    it, and the deterministic fingerprint every cached metric is keyed to. This
+    is the endpoint to cite when reporting a result.
+    """
+    analysis = GraphStore.get_healed() or GraphStore.get_osm_fallback()
+    if analysis is None:
+        raise HTTPException(status_code=503, detail={
+            "error": "no_graph_loaded",
+            "message": ("No road graph is loaded. The OSM extract is not committed "
+                        "to the repository; run scripts/download_data.py with network "
+                        "access to Overpass, or drop the artifact in place."),
+            "expected_artifact": "backend/data/graphs/osm_fallback.gpickle",
+            "see": "backend/data/README.md",
+        })
+
+    ml = GraphStore.get_ml_healed()
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(analysis))
+    return JSONResponse(with_provenance({
+        "analysis_graph": describe_graph_source(analysis),
+        "ml_derived_graph": describe_graph_source(ml) if ml is not None else None,
+        "ml_graph_affects_analysis": False,
+    }, prov))

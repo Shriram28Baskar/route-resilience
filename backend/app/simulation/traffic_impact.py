@@ -1,13 +1,22 @@
 """
-Traffic Impact Analyzer
-Translates network failures into human-readable economic and social metrics.
-Uses an Origin-Destination matrix and commuter data to compute:
-  - Commuter minutes delayed
-  - Person-days of productivity lost
-  - Economic loss in INR
+Traffic Impact Analyzer.
+
+STATUS: this module does NOT implement an origin-destination traffic model.
+
+It converts a set of failed nodes into economic figures using (a) sampled
+shortest-path inflation measured on the graph and (b) a chain of fixed
+constants. The trip-volume term is derived from ONE node's normalised
+betweenness, which is a shortest-path count, not a measured flow.
+
+Consequently every monetary figure this module returns is `derived` at best,
+and `synthetic` whenever the OD matrix is absent (which is the only mode the
+repository currently ships). The caller is responsible for surfacing that
+status; see app/provenance.py.
+
+A real implementation requires data/census/od_matrix.csv. Until that artifact
+exists the /simulate/traffic-impact endpoint returns 503 rather than numbers.
 """
 import csv
-import math
 import logging
 import os
 from typing import Dict, List, Any, Set
@@ -20,26 +29,14 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data")
 
 # Economic constants for Bengaluru
 _AVG_HOURLY_WAGE_INR = 285       # Average across all income groups
-_AVG_COMMUTER_TIME_MIN = 54      # BBMP survey baseline (minutes one-way)
 _DETOUR_PENALTY_PER_KM = 180     # INR in fuel + depreciation per km detour
 _WORKDAYS_PER_YEAR = 250
 _BENGALURU_DAILY_COMMUTERS = 9_200_000  # ~9.2M daily vehicular trips
 
 
-def _load_od_matrix() -> List[Dict]:
-    path = os.path.join(DATA_DIR, "census", "od_matrix.csv")
-    if not os.path.exists(path):
-        return []
-    with open(path, newline="") as f:
-        return list(csv.DictReader(f))
-
-
-def _haversine_km(lat1, lon1, lat2, lon2) -> float:
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
-    return R * 2 * math.asin(math.sqrt(max(0, a)))
+def od_matrix_available() -> bool:
+    """True when a real OD matrix is present. No fallback is synthesised."""
+    return os.path.exists(os.path.join(DATA_DIR, "census", "od_matrix.csv"))
 
 
 def compute_traffic_impact(
@@ -51,12 +48,6 @@ def compute_traffic_impact(
     estimates the human and economic cost of the disruption.
     """
     ablated_set: Set[Any] = set(ablated_node_ids)
-    od_rows = _load_od_matrix()
-
-    node_positions = {
-        n: (data.get("y", 0.0), data.get("x", 0.0))
-        for n, data in G.nodes(data=True)
-    }
 
     # ── 1. Graph-level path-length impact ────────────────────────────────────
     # Sample 30 random source nodes from non-ablated set for speed
@@ -105,10 +96,12 @@ def compute_traffic_impact(
     avg_detour_m    = max(0, avg_perturbed_m - avg_baseline_m)
     detour_km       = avg_detour_m / 1000
 
-    # ── 2. Real Traffic Volume Impact (via Centrality) ───────────────────────
-    # Betweenness centrality perfectly represents the fraction of all shortest paths
-    # fraction of all shortest paths passing through a node. If we sum the centrality of ablated nodes, we get
-    # the exact mathematical fraction of city-wide traffic disrupted!
+    # ── 2. Trip-volume proxy (NOT a measured flow) ───────────────────────────
+    # Betweenness is a count of shortest paths, not traffic volume: it assumes
+    # uniform demand between all node pairs, which no city satisfies. Using the
+    # MAX over ablated nodes (not a sum) and rescaling by a fixed 0.25 makes the
+    # result a monotone function of one node's centrality. This is a placeholder
+    # for an OD-matrix lookup and is reported as such in the provenance block.
     from app.graph_pipeline.centrality import compute_betweenness
     centrality_scores = compute_betweenness(G)
     
@@ -161,12 +154,22 @@ def compute_traffic_impact(
 
     total_economic_loss_inr = wage_loss_inr + fuel_loss_inr + logistics_loss_inr
 
-    # Annualise if disruption lasts a week (7 workdays)
+    # Projection if a disruption of this magnitude recurred on every workday of
+    # a year. This is an extrapolation, not a forecast.
     annual_loss_projection_inr = total_economic_loss_inr * _WORKDAYS_PER_YEAR
 
     unreachable_pct = (unreachable_pairs / max(1, total_pairs)) * 100
 
     return {
+        "model_assumptions": [
+            f"trip volume proxied by max normalised betweenness x 0.25 "
+            f"(no OD matrix); base {_BENGALURU_DAILY_COMMUTERS:,} daily trips",
+            f"gridlock delay = disruption_fraction x 300 minutes (fixed coefficient)",
+            f"wage {_AVG_HOURLY_WAGE_INR} INR/hr; detour cost {_DETOUR_PENALTY_PER_KM} INR/km",
+            f"unreachable trips charged 3x baseline distance",
+            f"logistics premium = 15% of wage+fuel loss",
+            f"annual projection = single-event loss x {_WORKDAYS_PER_YEAR} workdays",
+        ],
         "ablated_count":               len(ablated_set),
         "affected_daily_trips":        affected_trips,
         "avg_baseline_trip_m":         round(avg_baseline_m, 1),

@@ -1,0 +1,30 @@
+# Core: graph construction, resilience simulation, API, reports.
+# This is everything the resilience engine needs. It does NOT include PyTorch.
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9
+
+# Graph + geospatial (vector only — no raster stack)
+networkx==3.3
+osmnx==1.9.3
+geopandas==0.14.4
+shapely==2.0.4
+pyproj==3.6.1
+
+# Numeric / utils
+numpy==1.26.4
+scipy==1.13.1
+scikit-learn==1.5.0     # KMeans, used by compute_relief_camps (was undeclared)
+pillow==10.3.0
+matplotlib==3.9.0
+tqdm==4.66.4
+pydantic==2.7.3
+python-dotenv==1.0.1
+httpx==0.27.0
+aiofiles==23.2.1
+
+# LLM copilot
+groq==0.9.0
+
+# PDF reports
+reportlab==4.2.2

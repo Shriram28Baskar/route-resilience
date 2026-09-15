@@ -10,6 +10,15 @@ from typing import Dict, Optional
 
 import networkx as nx
 
+from app.graph_pipeline.fingerprint import (
+    FINGERPRINT_SCHEMA_VERSION,
+    StaleCacheError,
+    describe_graph_source,
+    graph_fingerprint,
+    strict_cache_mode,
+    verify_cache_fingerprint,
+)
+
 # Global weakref cache to avoid recalculating centrality for the same graph object.
 # Maps G -> { metric_name: metric_data }
 _centrality_cache = weakref.WeakKeyDictionary()
@@ -29,6 +38,50 @@ def _load_osm_fallback_criticality_cache() -> dict:
         except Exception as exc:
             logger.warning(f"Failed to load criticality cache from {CRITICALITY_CACHE_PATH}: {exc}")
     return {}
+
+
+def _load_verified_cache(G, metric: str):
+    """
+    Return a cached metric ONLY if the cache was computed for this exact graph.
+
+    The cache is keyed on the graph fingerprint (node IDs, edge set, routing
+    weights, AOI). A cache that does not match is refused: under
+    STRICT_GRAPH_CACHE it raises, otherwise it is discarded and recomputed.
+    Returns None when there is nothing usable.
+    """
+    disk_cache = _load_osm_fallback_criticality_cache()
+    if metric not in disk_cache:
+        return None
+    try:
+        usable = verify_cache_fingerprint(
+            disk_cache, G, CRITICALITY_CACHE_PATH, strict=strict_cache_mode()
+        )
+    except StaleCacheError:
+        raise
+    if not usable:
+        logger.warning(
+            "Discarding centrality cache at %s: it was computed for a different "
+            "graph (fingerprint mismatch). Recomputing %s.",
+            CRITICALITY_CACHE_PATH, metric,
+        )
+        return None
+    logger.info("Using fingerprint-verified disk cache for %s", metric)
+    return disk_cache[metric]
+
+
+def _store_verified_cache(G, metric: str, value):
+    """Persist a metric together with the fingerprint of the graph it describes."""
+    disk_cache = _load_osm_fallback_criticality_cache()
+    fp = graph_fingerprint(G)
+    if disk_cache.get("graph_fingerprint") != fp:
+        # Cache belongs to a different graph: start a fresh one rather than
+        # mixing metrics from two networks in one file.
+        disk_cache = {}
+    disk_cache["graph_fingerprint"] = fp
+    disk_cache["fingerprint_schema"] = FINGERPRINT_SCHEMA_VERSION
+    disk_cache["graph_source"] = describe_graph_source(G)
+    disk_cache[metric] = value
+    _save_osm_fallback_criticality_cache(disk_cache)
 
 
 def _save_osm_fallback_criticality_cache(cache_dict: dict):
@@ -60,10 +113,9 @@ def compute_betweenness(G: nx.Graph, k: Optional[int] = DEFAULT_K) -> Dict[int, 
         return {}
 
     if G.graph.get("is_osm_fallback"):
-        disk_cache = _load_osm_fallback_criticality_cache()
-        if "betweenness" in disk_cache:
-            logger.info("Returning disk-cached betweenness centrality for OSM fallback graph")
-            return disk_cache["betweenness"]
+        cached = _load_verified_cache(G, "betweenness")
+        if cached is not None:
+            return cached
 
     # Use exact algorithm for small graphs
     effective_k = None if n <= 500 else min(k or DEFAULT_K, n)
@@ -108,9 +160,7 @@ def compute_betweenness(G: nx.Graph, k: Optional[int] = DEFAULT_K) -> Dict[int, 
     _centrality_cache[G][cache_key] = all_centrality
 
     if G.graph.get("is_osm_fallback"):
-        disk_cache = _load_osm_fallback_criticality_cache()
-        disk_cache["betweenness"] = all_centrality
-        _save_osm_fallback_criticality_cache(disk_cache)
+        _store_verified_cache(G, "betweenness", all_centrality)
 
     return all_centrality
 
@@ -128,10 +178,9 @@ def compute_closeness(G: nx.Graph, k: Optional[int] = 50) -> Dict[int, float]:
         return _centrality_cache[G][cache_key]
 
     if G.graph.get("is_osm_fallback"):
-        disk_cache = _load_osm_fallback_criticality_cache()
-        if "closeness" in disk_cache:
-            logger.info("Returning disk-cached closeness centrality for OSM fallback graph")
-            return disk_cache["closeness"]
+        cached = _load_verified_cache(G, "closeness")
+        if cached is not None:
+            return cached
         
     logger.info(f"Computing closeness centrality (k={k})...")
     lcc = _largest_connected_component(G)
@@ -175,9 +224,7 @@ def compute_closeness(G: nx.Graph, k: Optional[int] = 50) -> Dict[int, float]:
     _centrality_cache[G][cache_key] = all_centrality
 
     if G.graph.get("is_osm_fallback"):
-        disk_cache = _load_osm_fallback_criticality_cache()
-        disk_cache["closeness"] = all_centrality
-        _save_osm_fallback_criticality_cache(disk_cache)
+        _store_verified_cache(G, "closeness", all_centrality)
 
     return all_centrality
 
@@ -193,19 +240,16 @@ def get_articulation_points(G: nx.Graph) -> list:
         return _centrality_cache[G][cache_key]
 
     if G.graph.get("is_osm_fallback"):
-        disk_cache = _load_osm_fallback_criticality_cache()
-        if "articulation_points" in disk_cache:
-            logger.info("Returning disk-cached articulation points for OSM fallback graph")
-            return disk_cache["articulation_points"]
+        cached = _load_verified_cache(G, "articulation_points")
+        if cached is not None:
+            return cached
         
     logger.info("Finding articulation points...")
     ap = list(nx.articulation_points(G))
     _centrality_cache[G][cache_key] = ap
 
     if G.graph.get("is_osm_fallback"):
-        disk_cache = _load_osm_fallback_criticality_cache()
-        disk_cache["articulation_points"] = ap
-        _save_osm_fallback_criticality_cache(disk_cache)
+        _store_verified_cache(G, "articulation_points", ap)
 
     return ap
 
@@ -227,10 +271,9 @@ def compute_edge_betweenness(G: nx.Graph, k: Optional[int] = DEFAULT_K) -> Dict[
         return _centrality_cache[G][cache_key]
 
     if G.graph.get("is_osm_fallback"):
-        disk_cache = _load_osm_fallback_criticality_cache()
-        if "edge_betweenness" in disk_cache:
-            logger.info("Returning disk-cached edge betweenness for OSM fallback graph")
-            return disk_cache["edge_betweenness"]
+        cached = _load_verified_cache(G, "edge_betweenness")
+        if cached is not None:
+            return cached
         
     logger.info(f"Computing edge betweenness, k={effective_k or 'exact'}")
     lcc = _largest_connected_component(G)
@@ -249,9 +292,7 @@ def compute_edge_betweenness(G: nx.Graph, k: Optional[int] = DEFAULT_K) -> Dict[
     _centrality_cache[G][cache_key] = centrality
 
     if G.graph.get("is_osm_fallback"):
-        disk_cache = _load_osm_fallback_criticality_cache()
-        disk_cache["edge_betweenness"] = centrality
-        _save_osm_fallback_criticality_cache(disk_cache)
+        _store_verified_cache(G, "edge_betweenness", centrality)
 
     return centrality
 

@@ -41,13 +41,23 @@ Thumbs.db
 # Datasets
 backend/data/spacenet_roads/
 
-# Prevent large unneeded files from being committed
-backend/data/
-data/
+# Large / derived artifacts. NOTE: backend/data/ is ignored EXCEPT for its
+# README and the small CSV fixtures, which must be reproducible additions
+# rather than silently-missing inputs (see backend/data/README.md).
+backend/data/*
+!backend/data/README.md
+!backend/data/census/
+backend/data/census/*
+!backend/data/infrastructure/
+backend/data/infrastructure/*
 cache/
 backend/cache/
 *.png
 *.tif
-*.json
 scratch.py
 test_request.py
+
+# A bare `*.json` previously lived here. It silently excluded every new JSON
+# config (package.json, tsconfig.json, any fixture), so it is scoped instead.
+backend/data/**/*.json
+backend/cache/**/*.json

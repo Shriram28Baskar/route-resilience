@@ -25,11 +25,15 @@ from app.simulation.fragility import generate_fragility_curve
 from app.graph_pipeline.centrality import compute_betweenness
 from app.graph_pipeline.metrics import compute_graph_metrics
 from app.graph_pipeline.graph_build import graph_to_geojson
-from app.simulation.topography import flood_ablate, get_elevation_bounds
+from app.simulation.topography import flood_ablate, get_elevation_bounds, DEMUnavailable
 from app.simulation.routing import compute_relief_camps
 from app.simulation.equity_resilience import compute_equity_metrics
 from app.simulation.traffic_impact import compute_traffic_impact
 from app.simulation.temporal_degradation import run_degradation_forecast
+from app.provenance import (
+    Provenance, MEASURED, DERIVED, SYNTHETIC, UNAVAILABLE,
+    measured, graph_input, with_provenance, artifact_present,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -81,11 +85,29 @@ def simulate_flood(req: FloodRequest):
     G = GraphStore.get_healed() or GraphStore.get_osm_fallback()
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
-    
-    bounds = get_elevation_bounds(G)
-    flooded = flood_ablate(G, req.water_level)
-    
+
+    # Without a DEM every node is assigned a constant elevation, which turns the
+    # flood into a global on/off switch at that constant. Returning numbers from
+    # that would be indistinguishable from a real inundation result.
+    prov = measured("dem")
+    prov.inputs.append(graph_input(G))
+    prov.require_available("/simulate/flood")
+
+    try:
+        bounds = get_elevation_bounds(G)
+        flooded = flood_ablate(G, req.water_level)
+    except DEMUnavailable as exc:
+        raise HTTPException(status_code=503, detail={
+            "error": "dem_unreadable", "endpoint": "/simulate/flood",
+            "message": str(exc), "see": "backend/data/README.md",
+        })
+
     elevation_unknown_count = sum(1 for _, data in G.nodes(data=True) if data.get('elevation_unknown', False))
+    if elevation_unknown_count:
+        prov.note(
+            f"{elevation_unknown_count} of {G.number_of_nodes()} nodes fell outside "
+            f"the DEM or hit nodata and were assigned a fallback elevation."
+        )
 
     impacted_areas = set()
     for n in flooded:
@@ -100,21 +122,26 @@ def simulate_flood(req: FloodRequest):
             if 12.91 <= lat <= 12.92 and 77.63 <= lon <= 77.66:
                 impacted_areas.add("Sarjapur Rd")
     
+    # hospitals_affected / emergency_stations_affected previously returned
+    # int(n_flooded * 0.005) and int(n_flooded * 0.002). No facility layer is
+    # joined to the graph, so those were node counts wearing a facility label.
+    # They are removed rather than relabelled.
+    prov.assume("population_per_node = 1008 (AOI population / baseline node count), "
+                "distributed uniformly across nodes")
+    prov.assume("cost_estimate_usd = 15000 per flooded node (flat coefficient, unsourced)")
     impact_metrics = {
         "population_affected": len(flooded) * 1008,
         "cost_estimate_usd": len(flooded) * 15000,
-        "hospitals_affected": max(0, int(len(flooded) * 0.005)),
-        "emergency_stations_affected": max(0, int(len(flooded) * 0.002)),
     }
 
-    return JSONResponse({
+    return JSONResponse(with_provenance({
         "ablated_nodes": [str(n) for n in flooded],
         "elevation_bounds": {"min": bounds[0], "max": bounds[1]},
         "water_level": req.water_level,
         "elevation_unknown_count": elevation_unknown_count,
         "impacted_areas": list(impacted_areas),
-        "impact_metrics": impact_metrics
-    })
+        "impact_metrics": impact_metrics,
+    }, prov))
 
 @router.get("/flood/curve")
 def get_flood_curve():
@@ -124,8 +151,18 @@ def get_flood_curve():
     G = GraphStore.get_healed() or GraphStore.get_osm_fallback()
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
-        
-    bounds = get_elevation_bounds(G)
+
+    prov = measured("dem")
+    prov.inputs.append(graph_input(G))
+    prov.require_available("/simulate/flood/curve")
+
+    try:
+        bounds = get_elevation_bounds(G)
+    except DEMUnavailable as exc:
+        raise HTTPException(status_code=503, detail={
+            "error": "dem_unreadable", "endpoint": "/simulate/flood/curve",
+            "message": str(exc), "see": "backend/data/README.md",
+        })
     curve = []
     
     min_elev = int(bounds[0])
@@ -146,8 +183,8 @@ def get_flood_curve():
             "water_level": level,
             "connectivity": round(connectivity, 2)
         })
-        
-    return JSONResponse(curve)
+
+    return JSONResponse(with_provenance({"curve": curve}, prov))
 
 @router.post("/relief-camps")
 def simulate_relief_camps(req: ReliefCampRequest):
@@ -167,10 +204,16 @@ def simulate_relief_camps(req: ReliefCampRequest):
         
     result = compute_relief_camps(G_perturbed, k=req.num_camps)
     
-    return JSONResponse({
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(G))
+    prov.assume("camp siting is K-Means on raw lat/lon (Euclidean in degrees), "
+                "NOT network distance")
+    prov.assume("population_estimate = catchment node count x 1008 (uniform "
+                "population per node)")
+    return JSONResponse(with_provenance({
         "camps": result["camps"],
         "catchment_mapping": result["catchment_mapping"],
-    })
+    }, prov))
 
 @router.post("/ablate")
 def ablate(req: AblateRequest):
@@ -205,7 +248,15 @@ def ablate(req: AblateRequest):
     geojson = graph_to_geojson(perturbed)
     pop_impact = estimate_population_impact(G, perturbed)
 
-    return JSONResponse({
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(G))
+    prov.assume(f"Resilience Index penalty_s={ri.get('penalty_s')}s charged per severed "
+                f"origin-destination pair; RI floor={ri.get('ri_floor')}")
+    prov.assume("population impact distributes a fixed AOI total uniformly across "
+                "baseline largest-component nodes (no census raster join)")
+    prov.note("RI is not comparable across networks; use unreachable_fraction and "
+              "reachable_path_inflation for cross-network statements.")
+    return JSONResponse(with_provenance({
         "ablated_nodes": node_ids,
         "graph_geojson": geojson,
         "baseline_metrics": baseline_metrics,
@@ -215,7 +266,13 @@ def ablate(req: AblateRequest):
         "perturbed_avg_path_length": ri["perturbed_avg_path"],
         "disconnected": ri["disconnected"],
         "population_impact": pop_impact,
-    })
+        # penalty-free decomposition (see app/simulation/resilience.py)
+        "unreachable_fraction": ri.get("unreachable_fraction"),
+        "reachable_path_inflation": ri.get("reachable_path_inflation"),
+        "penalty_s": ri.get("penalty_s"),
+        "ri_floor": ri.get("ri_floor"),
+        "ri_is_cross_network_comparable": ri.get("ri_is_cross_network_comparable"),
+    }, prov))
 
 
 class CompareRequest(BaseModel):
@@ -324,11 +381,16 @@ def ablate_compare(req: CompareRequest):
                 f"ratio undefined."
             )
 
-    return JSONResponse({
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(G))
+    prov.assume("random-failure control uses seed 42; betweenness uses k-sample "
+                "approximation with seed 42 above 500 nodes")
+    prov.note("Comparative ratios are reported as measured, in either direction.")
+    return JSONResponse(with_provenance({
         "strategies": results,
         "baseline_avg_path": baseline_path,
         "top_n": n,
-    })
+    }, prov))
 
 
 class PrescribeRequest(BaseModel):
@@ -463,12 +525,19 @@ def ablate_prescribe(req: PrescribeRequest):
             if len(suggestions) >= req.max_recommendations:
                 break
 
-    return JSONResponse({
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(G))
+    prov.assume("proposed bridges are assigned time_s=90s/length=750m (bridge) or "
+                "time_s=60s/length=500m (parallel link); no engineering costing")
+    prov.note("validated_ri is the measured result of re-running the identical "
+              "attack on the hardened graph, including when the intervention "
+              "does not help (validation_outcome=no_change|degrades).")
+    return JSONResponse(with_provenance({
         "baseline_ri": round(baseline_ri, 4),
         "attacked_ri": round(attacked_ri, 4),
         "ablated_count": len(target_nodes),
         "suggestions": suggestions,
-    })
+    }, prov))
 
 
 class VulnerabilityRequest(BaseModel):
@@ -519,12 +588,20 @@ def ablate_vulnerability(req: VulnerabilityRequest):
     baseline_metrics = compute_graph_metrics(G, fast=True)
     art_count = len(art_points)
 
+    _vuln_prov = Provenance(status=MEASURED)
+    _vuln_prov.inputs.append(graph_input(G))
+    _vuln_prov.assume("estimated_impact_nodes = normalised betweenness x node count "
+                      "(an upper-bound proxy, not a measured reachability count)")
+    _vuln_prov.assume("risk_label thresholds (0.5 / 0.2 betweenness) are display "
+                      "bands, not calibrated risk classes")
+
     return JSONResponse({
         "critical_nodes": critical_nodes,
         "articulation_point_count": art_count,
         "total_nodes": G.number_of_nodes(),
         "total_edges": G.number_of_edges(),
         "baseline_metrics": baseline_metrics,
+        "data_provenance": _vuln_prov.to_dict(),
         "fragility_summary": {
             "single_points_of_failure": art_count,
             "risk_level": "HIGH" if art_count > 100 else ("MODERATE" if art_count > 20 else "LOW"),
@@ -550,11 +627,17 @@ def cascade(req: CascadeRequest):
 
     steps = run_cascade(G, seed_nodes, max_iterations=req.max_iterations, threshold=req.threshold)
 
-    return JSONResponse({
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(G))
+    prov.assume(f"a node is 'stressed' at normalised betweenness >= "
+                f"{req.threshold} x max; no load-redistribution physics is modelled")
+    prov.note("Per-iteration counts are reported as measured; no decay is imposed. "
+              "Each step reports the dampening_factor in effect.")
+    return JSONResponse(with_provenance({
         "seed_nodes": req.node_ids,
         "cascade_steps": steps,
         "total_iterations": len(steps),
-    })
+    }, prov))
 
 
 @router.post("/route")
@@ -635,7 +718,14 @@ def route(req: RouteRequest):
     else:
         result["comparison_status"] = "no_ablation_requested"
 
-    return JSONResponse(result)
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(G))
+    prov.assume(f"routing weight='{req.weight_type}'; edge times derive from OSM "
+                f"maxspeed where tagged, else a highway-class default speed")
+    prov.assume("alternative routes are generated by 4x penalising the previous "
+                "route's edges; they may coincide with the primary route when no "
+                "topologically distinct alternative exists")
+    return JSONResponse(with_provenance(result, prov))
 
 @router.post("/scenarios")
 def scenarios(req: MultiScenarioRequest):
@@ -646,8 +736,10 @@ def scenarios(req: MultiScenarioRequest):
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
         
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(G))
     results = run_multi_scenario(G, [s.dict() for s in req.scenarios])
-    return JSONResponse({"scenarios": results})
+    return JSONResponse(with_provenance({"scenarios": results}, prov))
 
 
 
@@ -667,10 +759,14 @@ def resilience_score():
     # Simple score based on LCC
     score = (0.7 * lcc_fraction) + 0.3
     
-    return JSONResponse({
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(G))
+    prov.assume("global_resilience_score = 0.7 x largest_component_fraction + 0.3 "
+                "(weights chosen for display, not calibrated)")
+    return JSONResponse(with_provenance({
         "global_resilience_score": round(score, 4),
         "metrics": metrics
-    })
+    }, prov))
 
 @router.get("/fragility")
 def get_fragility():
@@ -681,8 +777,12 @@ def get_fragility():
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
         
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(G))
+    prov.assume("nodes removed in descending betweenness order; global efficiency "
+                "approximated by largest-component fraction above 500 nodes")
     result = generate_fragility_curve(G, num_steps=20)
-    return JSONResponse(result)
+    return JSONResponse(with_provenance(result, prov))
 
 @router.get("/recommendations")
 def get_recommendations():
@@ -693,8 +793,11 @@ def get_recommendations():
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
 
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(G))
+    prov.assume("cost_estimate strings are indicative ranges, not costed estimates")
     recs = generate_recommendations(G)
-    return JSONResponse({"recommendations": recs})
+    return JSONResponse(with_provenance({"recommendations": recs}, prov))
 
 class SimulateInvestmentRequest(BaseModel):
     recommendation_idx: int
@@ -772,7 +875,11 @@ def timeline(req: TimelineRequest):
     from app.simulation.timeline import run_progression_timeline
     steps = run_progression_timeline(G, seed_nodes, repair_rate=req.repair_rate, max_days=req.max_days)
 
-    return JSONResponse({"timeline_steps": steps})
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(G))
+    prov.assume(f"repair_rate={req.repair_rate} nodes/day, applied uniformly; "
+                f"no crew, budget or access constraints are modelled")
+    return JSONResponse(with_provenance({"timeline_steps": steps}, prov))
 
 
 # ── Equity Metrics ─────────────────────────────────────────────────────────────
@@ -800,9 +907,18 @@ def get_equity_metrics(req: EquityMetricsRequest):
     else:
         G_perturbed = G
 
+    # Without vulnerability.csv every node defaults to a constant 0.25, so
+    # "equity-weighted" crisis priority collapses to a rescaled copy of
+    # betweenness and contributes no equity information whatsoever.
+    prov = measured("vulnerability_csv")
+    prov.inputs.append(graph_input(G))
+    prov.require_available("/simulate/equity-metrics")
+
     centrality = compute_betweenness(G_perturbed, k=min(200, G_perturbed.number_of_nodes()))
     result = compute_equity_metrics(G_perturbed, centrality)
-    return JSONResponse(result)
+    prov.assume("crisis_priority = betweenness x zone vulnerability score "
+                "(nearest-zone assignment by great-circle distance)")
+    return JSONResponse(with_provenance(result, prov))
 
 
 # ── Traffic Impact ─────────────────────────────────────────────────────────────
@@ -820,11 +936,20 @@ def get_traffic_impact(req: TrafficImpactRequest):
     if G is None:
         raise HTTPException(status_code=404, detail="No graph available.")
 
+    # The economic figures are a chain of fixed coefficients applied to one
+    # node's normalised betweenness. Without a measured OD matrix they describe
+    # no real commuter population, so no number is returned.
+    prov = measured("od_matrix_csv")
+    prov.inputs.append(graph_input(G))
+    prov.require_available("/simulate/traffic-impact")
+
     node_map = {str(n): n for n in G.nodes()}
     ablated = [node_map[nid] for nid in req.ablated_node_ids if nid in node_map]
 
     result = compute_traffic_impact(G, ablated)
-    return JSONResponse(result)
+    for a_ in result.get("model_assumptions", []):
+        prov.assume(a_)
+    return JSONResponse(with_provenance(result, prov))
 
 
 # ── Temporal Degradation ──────────────────────────────────────────────────────
@@ -847,13 +972,24 @@ def get_degradation_forecast(req: DegradationRequest):
     if req.budget_scenario not in ("optimistic", "baseline", "austerity"):
         raise HTTPException(status_code=400, detail="budget_scenario must be optimistic, baseline, or austerity.")
 
+    # Without road_conditions.csv the module returns a hardcoded linear decay
+    # (0.72 - 0.03/yr) that is IDENTICAL for every budget scenario, making the
+    # optimistic/baseline/austerity selector inert. That is not a forecast.
+    prov = measured("road_conditions_csv")
+    prov.inputs.append(graph_input(G))
+    prov.require_available("/simulate/degradation-forecast")
+
     result = run_degradation_forecast(
         G,
         years=min(req.years, 20),
         monte_carlo_runs=min(req.monte_carlo_runs, 200),
         budget_scenario=req.budget_scenario,
     )
-    return JSONResponse(result)
+    prov.assume("per-segment health decays by its own degradation_rate_per_year "
+                "with a Gaussian shock (sigma=0.015) and log-scaled maintenance offset")
+    prov.assume(f"budget multiplier for '{req.budget_scenario}' applied to the "
+                f"annual maintenance budget column")
+    return JSONResponse(with_provenance(result, prov))
 
 
 # ── Evacuation Planning ───────────────────────────────────────────────────────
@@ -882,9 +1018,19 @@ def run_evacuation(req: EvacuationRequest):
     node_map = {str(n): n for n in G.nodes()}
     ablated = [node_map[nid] for nid in req.ablated_node_ids if nid in node_map]
 
-    result = plan_evacuation(
-        G,
-        ablated_nodes=ablated,
-        time_horizon_hours=req.time_horizon_hours,
+    # app/simulation/evacuation.py is a stub returning empty assignments. An
+    # empty plan is indistinguishable from "nobody needs evacuating", so the
+    # endpoint declares itself unimplemented instead of returning it.
+    raise HTTPException(
+        status_code=503,
+        detail={
+            "error": "not_implemented",
+            "endpoint": "/simulate/evacuate",
+            "message": (
+                "Multi-source evacuation planning is not implemented. "
+                "app/simulation/evacuation.py returns a fixed empty result; "
+                "returning it would imply a computed plan."
+            ),
+            "requires": ["shelter capacity layer", "population-to-node assignment"],
+        },
     )
-    return JSONResponse(result)

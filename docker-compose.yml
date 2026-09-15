@@ -1,19 +1,27 @@
-version: "3.9"
-
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        # requirements-core.txt (default) omits PyTorch and rasterio.
+        # Use requirements-raster.txt to enable /simulate/flood*, or
+        # requirements-ml.txt together with ENABLE_ML=true for /segment/*.
+        REQUIREMENTS: ${BACKEND_REQUIREMENTS:-requirements-core.txt}
     container_name: rr-backend
     ports:
       - "8000:8000"
     environment:
-      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
       - APP_ENV=production
+      - ENABLE_ML=${ENABLE_ML:-false}
+      - STRICT_GRAPH_CACHE=${STRICT_GRAPH_CACHE:-false}
       - AOI_SOUTH=12.9200
       - AOI_WEST=77.5700
       - AOI_NORTH=12.9900
       - AOI_EAST=77.6400
     volumes:
+      # Data artifacts live on the host, not in the image. Endpoints that need a
+      # missing artifact return 503; see backend/data/README.md.
       - ./backend/data:/app/data
     restart: unless-stopped
     healthcheck:
@@ -23,12 +31,16 @@ services:
       retries: 3
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # NEXT_PUBLIC_* is inlined at build time, so this MUST be a build arg.
+        # It is the URL the user's BROWSER calls, i.e. the published host port —
+        # not the compose service name, which the browser cannot resolve.
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8000}
     container_name: rr-frontend
     ports:
       - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_BASE=http://backend:8000
     depends_on:
       backend:
         condition: service_healthy

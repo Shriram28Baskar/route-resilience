@@ -5,6 +5,7 @@ Also provides GraphStore — an in-memory singleton holding the active graphs.
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple
 
 import numpy as np
@@ -279,6 +280,30 @@ def _parse_speed_limit(data: dict) -> float:
         return SPEED_LIMITS.get(highway, 30.0)
     return 30.0
 
+def _stamp_provenance(G: nx.Graph, artifact: str, osmnx_version: str = None,
+                      downloaded_utc: str = None) -> None:
+    """
+    Record, on the graph itself, exactly which artifact is being analysed.
+
+    These attributes feed the fingerprint and the /graph/source endpoint, so a
+    result can always be traced back to the network version it came from.
+    Values already present (e.g. loaded from a cached pickle) are preserved.
+    """
+    G.graph.setdefault("artifact", artifact)
+    G.graph.setdefault("aoi_bbox", {
+        "south": AOI_SOUTH, "west": AOI_WEST, "north": AOI_NORTH, "east": AOI_EAST,
+    })
+    G.graph.setdefault("network_type", "drive")
+    if osmnx_version:
+        G.graph.setdefault("osmnx_version", osmnx_version)
+    if downloaded_utc:
+        G.graph.setdefault("downloaded_utc", downloaded_utc)
+    G.graph.setdefault(
+        "source_id",
+        f"osm:drive:{AOI_SOUTH},{AOI_WEST},{AOI_NORTH},{AOI_EAST}",
+    )
+
+
 async def _load_osm_graph() -> nx.Graph:
     """
     Load the road network for the configured AOI from OpenStreetMap via OSMnx.
@@ -295,6 +320,7 @@ async def _load_osm_graph() -> nx.Graph:
         with open(cache_path, "rb") as f:
             G = pickle.load(f)
         G.graph["is_osm_fallback"] = True
+        _stamp_provenance(G, artifact=cache_path)
         # Ensure all edges have speed_kph and time_s computed, even if loaded from an old cache
         updated = False
         for u, v, data in G.edges(data=True):
@@ -318,6 +344,8 @@ async def _load_osm_graph() -> nx.Graph:
     )
     G = ox.convert.to_undirected(G_osm)
     G.graph["is_osm_fallback"] = True
+    _stamp_provenance(G, artifact=cache_path, osmnx_version=ox.__version__,
+                      downloaded_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"))
 
     # Standardize node attributes
     for node_id, data in G.nodes(data=True):

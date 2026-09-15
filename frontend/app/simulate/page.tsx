@@ -12,7 +12,8 @@ import {
 import type {
   AblationResponse, CriticalityResponse, Recommendation, FragilityResponse,
   MultiScenarioResponse, EquityMetricsResponse, TrafficImpactResponse,
-  DegradationForecastResponse, AblateCompareResponse, PrescribeResponse, VulnerabilityResponse
+  DegradationForecastResponse, AblateCompareResponse, PrescribeResponse, VulnerabilityResponse,
+  CascadeStep
 } from "@/lib/api";
 import { resilienceColor, centralityColor, formatDistance, formatDuration } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, ReferenceLine, CartesianGrid, Legend } from "recharts";
@@ -156,7 +157,7 @@ export default function SimulatePage() {
       // HYBRID MATRIX: If the user built a custom disaster (via Ablation or Flood), add it to the comparison matrix!
       const customAblated = [
         ...(ablation?.ablated_nodes || []),
-        ...(cascade?.cascade_steps?.flatMap(s => s.ablated_nodes) || []),
+        ...(cascade?.cascade_steps?.flatMap((s: CascadeStep) => s.ablated) || []),
         ...(flood?.ablated_nodes || [])
       ].filter(Boolean);
 
@@ -459,7 +460,12 @@ export default function SimulatePage() {
             {/* Run button */}
             {tab !== "flood" && (
               <button
-                onClick={tab === "ablate" ? handleAblate : tab === "route" ? handleRoute : tab === "flood" ? handleFlood : tab === "traffic" ? handleTrafficImpact : handleScenarios}
+                onClick={() => {
+                  if (tab === "ablate") return handleAblate();
+                  if (tab === "route") return handleRoute();
+                  if (tab === "traffic") return handleTrafficImpact();
+                  return handleScenarios();
+                }}
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#00E5B4] text-[#0B0F1A] font-display font-bold rounded-xl hover:bg-[#00B38A] transition-colors disabled:opacity-50"
               >
@@ -561,7 +567,7 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
         )}
         {tab === "ablate" && cascade && (
           <motion.div key="cascade" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <CascadeResults result={cascade} totalNodes={vulnerability?.total_nodes ?? 13486} />
+            <CascadeResults result={cascade} totalNodes={vulnerability?.total_nodes ?? 0} />
           </motion.div>
         )}
         {tab === "route" && route && (
@@ -1828,7 +1834,9 @@ function FragilityResults({ fragility }: { fragility: FragilityResponse }) {
           <div>
             <div className="text-[#FF4444] font-semibold text-xs mb-0.5">Collapse Threshold</div>
             <div className="text-xs text-[#9CA3AF]">
-              ~{Math.round(fragility.percolation_threshold * 13486)} critical nodes removed. Resilience drops precipitously below 0.70.
+              Percolation threshold: {(fragility.percolation_threshold * 100).toFixed(1)}% of
+              nodes removed, ranked by betweenness. Measured on the currently loaded
+              graph; see <code>/graph/source</code> for its fingerprint.
             </div>
           </div>
         </div>

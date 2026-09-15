@@ -1,7 +1,22 @@
-import rasterio
-import networkx as nx
-from typing import List, Tuple
+"""
+DEM-based flood ablation.
+
+rasterio is imported lazily: it is needed only when a DEM is actually sampled,
+and a hard top-level import made the ENTIRE simulation router unimportable
+without the raster stack installed.
+"""
+import logging
 import os
+from typing import List, Tuple
+
+import networkx as nx
+
+logger = logging.getLogger(__name__)
+
+
+class DEMUnavailable(RuntimeError):
+    """Raised when elevations are requested but no DEM can be read."""
+
 
 # Relative to where the backend server runs
 DEM_PATH = "data/rasters/dem.tif"
@@ -12,16 +27,25 @@ def initialize_elevations(G: nx.MultiDiGraph):
     if first_node is not None and 'elevation' in G.nodes[first_node]:
         return
 
-    GEOID_OFFSET = 820.0
     if not os.path.exists(DEM_PATH):
-        print(f"Warning: DEM file not found at {DEM_PATH}. Using fallback elevations.")
-        for node in G.nodes():
-            G.nodes[node]['elevation'] = 900.0
-            G.nodes[node]['elevation_unknown'] = True
-        return
+        # Previously every node was assigned a constant 900.0 m, which turned the
+        # flood model into a global on/off switch at that constant while still
+        # emitting impact numbers. Callers must handle absence explicitly.
+        raise DEMUnavailable(
+            f"No DEM at {DEM_PATH}. Elevation-dependent results are unavailable; "
+            f"see backend/data/README.md."
+        )
 
     try:
-        print(f"Loading elevations from {DEM_PATH}...")
+        import rasterio
+    except ImportError as exc:
+        raise DEMUnavailable(
+            f"rasterio is not installed, so the DEM at {DEM_PATH} cannot be read. "
+            f"Install requirements-raster.txt."
+        ) from exc
+
+    try:
+        logger.info("Loading elevations from %s", DEM_PATH)
         with rasterio.open(DEM_PATH) as src:
             for node, data in G.nodes(data=True):
                 lat = data.get('y')
@@ -48,12 +72,9 @@ def initialize_elevations(G: nx.MultiDiGraph):
                 else:
                     G.nodes[node]['elevation'] = 900.0
                     G.nodes[node]['elevation_unknown'] = True
-        print("Elevations successfully loaded.")
+        logger.info("Elevations loaded from DEM.")
     except Exception as e:
-        print(f"Error loading DEM: {e}")
-        for node in G.nodes():
-            G.nodes[node]['elevation'] = 900.0
-            G.nodes[node]['elevation_unknown'] = True
+        raise DEMUnavailable(f"Failed to read DEM at {DEM_PATH}: {e}") from e
 
 def flood_ablate(G: nx.MultiDiGraph, water_level: float) -> List[int]:
     """Returns a list of node IDs that are at or below the given water_level."""

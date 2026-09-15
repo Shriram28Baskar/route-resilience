@@ -15,6 +15,7 @@ from app.simulation.ablation import ablate_nodes
 from app.integrations.overpass import fetch_facilities
 from app.graph_pipeline.metrics import multi_source_shortest_paths
 from app.simulation.equity import generate_equity_analysis
+from app.provenance import Provenance, MEASURED, measured, graph_input, with_provenance
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -110,8 +111,19 @@ async def equity_analysis(
     if not facilities:
         raise HTTPException(status_code=404, detail="No facilities found.")
         
+    # vulnerable_clusters comes entirely from worldpop_bengaluru.csv; without it
+    # the endpoint returns an equity_score computed from desert count alone while
+    # reporting zero vulnerable population, which reads as "no vulnerability".
+    prov = measured("worldpop_csv")
+    prov.inputs.append(graph_input(G))
+    prov.require_available("/accessibility/equity")
+
     result = generate_equity_analysis(G, facilities)
-    return JSONResponse(result)
+    prov.assume("healthcare-desert test uses straight-line distance on a 5x5 grid "
+                "over the AOI with a 5 km threshold, NOT network travel time")
+    prov.assume("equity_score = 100 - 5 per desert cell - 10 per HIGH-risk ward "
+                "(display heuristic, uncalibrated)")
+    return JSONResponse(with_provenance(result, prov))
 
 @router.get("/emergency-services")
 async def emergency_services(
