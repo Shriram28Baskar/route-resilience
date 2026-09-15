@@ -197,16 +197,102 @@ export interface ResilienceScoreResponse {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+// ── Data provenance ────────────────────────────────────────────────────────
+// Every numeric endpoint declares where its numbers came from. The UI must
+// render this: a `derived` figure is a modelling assumption chain, not a
+// measurement, and the user cannot tell them apart from the value alone.
+
+export type ProvenanceStatus = "measured" | "derived" | "synthetic" | "unavailable";
+
+export interface ProvenanceInput {
+  name: string;
+  kind: string;
+  status: ProvenanceStatus;
+  path?: string;
+  present?: boolean;
+  obtain?: string | null;
+  fingerprint?: string | null;
+  source?: Record<string, unknown> | null;
+  nodes?: number;
+  edges?: number;
+  detail?: string;
+}
+
+export interface DataProvenance {
+  status: ProvenanceStatus;
+  inputs: ProvenanceInput[];
+  assumptions: string[];
+  notes: string[];
+}
+
+/** Anything the backend may annotate with provenance. */
+export interface MaybeProvenanced {
+  data_provenance?: DataProvenance;
+}
+
+/**
+ * Thrown when a required input is absent. The backend returns 503 rather than
+ * a substitute value, so the UI must show WHICH artifact is missing instead of
+ * an empty chart.
+ */
+export class DataUnavailableError extends Error {
+  readonly status: number;
+  readonly endpoint?: string;
+  readonly missing: ProvenanceInput[];
+  readonly reason: string;
+  readonly see?: string;
+
+  constructor(status: number, detail: any, path: string) {
+    const msg = detail?.message ?? detail?.error ?? `API ${status}`;
+    super(msg);
+    this.name = "DataUnavailableError";
+    this.status = status;
+    this.endpoint = detail?.endpoint ?? path;
+    this.missing = detail?.missing ?? [];
+    this.reason = detail?.error ?? "unavailable";
+    this.see = detail?.see;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
   if (!res.ok) {
-    const detail = await res.text().catch(() => res.statusText);
-    throw new Error(`API ${res.status}: ${detail}`);
+    const raw = await res.text().catch(() => res.statusText);
+    if (res.status === 503) {
+      let detail: any = raw;
+      try {
+        detail = JSON.parse(raw)?.detail ?? raw;
+      } catch {
+        /* non-JSON body: fall through with the raw text */
+      }
+      throw new DataUnavailableError(res.status, detail, path);
+    }
+    throw new Error(`API ${res.status}: ${raw}`);
   }
   return res.json() as Promise<T>;
+}
+
+/** Fetch the fingerprint + AOI of the graph currently under analysis. */
+export interface GraphSourceResponse extends MaybeProvenanced {
+  analysis_graph: {
+    artifact: string;
+    aoi_bbox: Record<string, number> | null;
+    osmnx_version: string | null;
+    downloaded_utc: string | null;
+    fingerprint: string;
+    fingerprint_schema: string;
+    nodes: number;
+    edges: number;
+  } | null;
+  ml_derived_graph: unknown | null;
+  ml_graph_affects_analysis: boolean;
+}
+
+export async function getGraphSource(): Promise<GraphSourceResponse> {
+  return request<GraphSourceResponse>(`/graph/source`);
 }
 
 // ── Graph API ──────────────────────────────────────────────────────────────

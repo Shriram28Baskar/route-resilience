@@ -15,6 +15,8 @@ import type {
   DegradationForecastResponse, AblateCompareResponse, PrescribeResponse, VulnerabilityResponse,
   CascadeStep
 } from "@/lib/api";
+import { DataUnavailableError } from "@/lib/api";
+import { ProvenanceBadge, DataUnavailablePanel } from "@/components/ProvenanceBadge";
 import { resilienceColor, centralityColor, formatDistance, formatDuration } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, ReferenceLine, CartesianGrid, Legend } from "recharts";
 import { Waves, Tent } from "lucide-react";
@@ -49,6 +51,7 @@ export default function SimulatePage() {
   const [tgtNode, setTgtNode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState<DataUnavailableError | null>(null);
   const [isPlayingFlood, setIsPlayingFlood] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [numCamps, setNumCamps] = useState(3);
@@ -95,7 +98,10 @@ export default function SimulatePage() {
         (centrality?.gatekeepers.slice(0, autoTopN).map(g => g.node_id) ?? []);
       const cascadeRes = await runCascade(seeds, cascadeDepth, 0.7);
       setCascade(cascadeRes);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      if (e instanceof DataUnavailableError) { setUnavailable(e); setError(null); }
+      else { setError(e.message); setUnavailable(null); }
+    }
     finally { setLoading(false); }
   };
 
@@ -112,7 +118,10 @@ export default function SimulatePage() {
       
       const reliefRes = await getReliefCamps(allBrokenNodes, numCamps);
       setRelief(reliefRes);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      if (e instanceof DataUnavailableError) { setUnavailable(e); setError(null); }
+      else { setError(e.message); setUnavailable(null); }
+    }
     finally { setLoading(false); }
   };
 
@@ -121,7 +130,10 @@ export default function SimulatePage() {
     try {
       const res = await getRecommendations();
       setRecommendations(res.recommendations);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      if (e instanceof DataUnavailableError) { setUnavailable(e); setError(null); }
+      else { setError(e.message); setUnavailable(null); }
+    }
     finally { setLoading(false); }
   };
 
@@ -130,7 +142,10 @@ export default function SimulatePage() {
     try {
       const res = await simulateInvestment(idx);
       setInvestmentSim(res);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      if (e instanceof DataUnavailableError) { setUnavailable(e); setError(null); }
+      else { setError(e.message); setUnavailable(null); }
+    }
     finally { setLoading(false); }
   };
 
@@ -139,7 +154,10 @@ export default function SimulatePage() {
     try {
       const res = await getFragilityCurve();
       setFragility(res);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      if (e instanceof DataUnavailableError) { setUnavailable(e); setError(null); }
+      else { setError(e.message); setUnavailable(null); }
+    }
     finally { setLoading(false); }
   };
 
@@ -172,21 +190,27 @@ export default function SimulatePage() {
       setScenarios(res);
       const recRes = await getRecommendations();
       setRecommendations(recRes.recommendations);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      if (e instanceof DataUnavailableError) { setUnavailable(e); setError(null); }
+      else { setError(e.message); setUnavailable(null); }
+    }
     finally { setLoading(false); }
   };
 
   const handleFlood = async (silent = false) => {
     if (!silent) setLoading(true);
     else setIsSyncing(true);
-    setError(null);
+    setError(null); setUnavailable(null);
     try {
       const res = await simulateFlood(waterLevel);
       setFlood(res);
       if (res.elevation_bounds) {
         setElevationBounds(res.elevation_bounds);
       }
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      if (e instanceof DataUnavailableError) { setUnavailable(e); setError(null); }
+      else { setError(e.message); setUnavailable(null); }
+    }
     finally { 
       if (!silent) setLoading(false);
       else setIsSyncing(false);
@@ -201,7 +225,10 @@ export default function SimulatePage() {
       const allBrokenNodes = Array.from(new Set([...floodedNodes, ...ablatedNodes]));
       const res = await getReliefCamps(allBrokenNodes, n ?? numCamps);
       setRelief(res);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      if (e instanceof DataUnavailableError) { setUnavailable(e); setError(null); }
+      else { setError(e.message); setUnavailable(null); }
+    }
     finally { setLoading(false); }
   };
 
@@ -213,7 +240,10 @@ export default function SimulatePage() {
       const allBrokenNodes = Array.from(new Set([...floodedNodes, ...ablatedNodes]));
       const res = await getEquityMetrics(allBrokenNodes);
       setEquityMetrics(res);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      if (e instanceof DataUnavailableError) { setUnavailable(e); setError(null); }
+      else { setError(e.message); setUnavailable(null); }
+    }
     finally { setLoading(false); }
   };
 
@@ -229,7 +259,10 @@ export default function SimulatePage() {
       const allBrokenNodes = Array.from(new Set([...floodedNodes, ...ablatedNodes]));
       const equityRes = await getEquityMetrics(allBrokenNodes.length > 0 ? allBrokenNodes : nodes);
       setEquityMetrics(equityRes);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      if (e instanceof DataUnavailableError) { setUnavailable(e); setError(null); }
+      else { setError(e.message); setUnavailable(null); }
+    }
     finally { setLoading(false); }
   };
 
@@ -238,7 +271,10 @@ export default function SimulatePage() {
     try {
       const res = await getDegradationForecast(10, 50, budgetScenario);
       setDegradation(res);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      if (e instanceof DataUnavailableError) { setUnavailable(e); setError(null); }
+      else { setError(e.message); setUnavailable(null); }
+    }
     finally { setLoading(false); }
   };
 
@@ -475,7 +511,9 @@ export default function SimulatePage() {
               </button>
             )}
 
-            {error && (
+            {unavailable && <DataUnavailablePanel error={unavailable} />}
+
+            {error && !unavailable && (
               <div className="bg-[#FF4444]/10 border border-[#FF4444]/20 rounded-xl p-4 text-[#FF4444] text-xs">{error}</div>
             )}
           </div>
@@ -695,7 +733,7 @@ function SimulateResults({ tab, result, ablation, cascade, route, centrality, gr
   );
 }
 
-function AblationResults({ result, vulnerability }: { result: AblationResponse, vulnerability?: VulnerabilityResponse | null }) {
+function AblationResults({ result, vulnerability }: { result: AblationResponse & { data_provenance?: any }, vulnerability?: VulnerabilityResponse | null }) {
   const [compare, setCompare] = useState<AblateCompareResponse | null>(null);
   const [prescribe, setPrescribe] = useState<PrescribeResponse | null>(null);
 
@@ -1017,12 +1055,13 @@ function AblationResults({ result, vulnerability }: { result: AblationResponse, 
         </div>
       )}
 
+      <ProvenanceBadge provenance={(result as any)?.data_provenance} />
     </div>
   );
 }
 
 
-function CascadeResults({ result, totalNodes }: { result: { seed_nodes?: string[], cascade_steps: any[] }, totalNodes: number }) {
+function CascadeResults({ result, totalNodes }: { result: { seed_nodes?: string[], cascade_steps: any[], data_provenance?: any }, totalNodes: number }) {
   const [expanded, setExpanded] = useState<number | null>(0);
   const steps = result.cascade_steps;
 
@@ -1382,6 +1421,7 @@ function CascadeResults({ result, totalNodes }: { result: { seed_nodes?: string[
           </div>
         </div>
       )}
+      <ProvenanceBadge provenance={(result as any)?.data_provenance} />
     </div>
   );
 }
@@ -1671,6 +1711,7 @@ function RouteResults({ result, activeRoute, setActiveRoute }: { result: any, ac
           </div>
         </div>
       </div>
+      <ProvenanceBadge provenance={(result as any)?.data_provenance} />
     </div>
   );
 }

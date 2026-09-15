@@ -43,8 +43,13 @@ def generate_recommendations(G: nx.Graph) -> List[Dict[str, Any]]:
             "title": f"Harden Critical Intersection #{top_node}",
             "description": "This node is a critical gatekeeper. Reinforcing it prevents major network partitioning.",
             "target_node": str(top_node),
-            "rgs": round(max(rgs, 0.05), 3),
-            "cost_estimate": "₹2.5 Cr - ₹5.0 Cr",
+            # Previously max(rgs, 0.05): a floor that guaranteed every
+            # recommendation looked beneficial. Reported as measured.
+            "rgs": round(rgs, 4),
+            "rgs_definition": "1 - RI(baseline with this node ablated); "
+                              "the damage averted IF hardening fully prevents failure",
+            # Cost figures were unsourced literals. No costing model exists.
+            "cost_estimate": None,
             "action": "flood_barrier"
         })
 
@@ -65,24 +70,39 @@ def generate_recommendations(G: nx.Graph) -> List[Dict[str, Any]]:
             
             G_bypass.add_edge(n1, n2, weight=dist, length=dist, speed_kph=50, time_s=dist/(50*1000/3600))
             
-            # Ablate top node to see if bypass helps
+            # Ablate the same node with and without the bypass.
+            #
+            # Both RIs MUST be measured against the same baseline graph G.
+            # Previously the hardened run used G_bypass as its own baseline, so
+            # the two indices had different denominators and their difference
+            # was not a gain at all.
             pert_base = ablate_nodes(G, [top_node])
             pert_bypass = ablate_nodes(G_bypass, [top_node])
-            
-            ri_base = compute_resilience_index(G, pert_base)["resilience_index"] or 0
-            ri_bypass = compute_resilience_index(G_bypass, pert_bypass)["resilience_index"] or 0
-            rgs = ri_bypass - ri_base
+
+            ri_base = compute_resilience_index(G, pert_base)["resilience_index"]
+            ri_bypass = compute_resilience_index(G, pert_bypass)["resilience_index"]
+            rgs = (ri_bypass - ri_base) if (ri_base is not None and ri_bypass is not None) else None
             
             recs.append({
                 "type": "bypass",
                 "title": f"Construct Bypass Corridor",
                 "description": f"A new road segment connecting #{n1} and #{n2} provides an alternate route during central corridor failures.",
                 "target_nodes": [str(n1), str(n2)],
-                "rgs": round(max(rgs, 0.08), 3), # ensure positive for demo
-                "cost_estimate": "$1.2M - $3.0M",
+                # Previously max(rgs, 0.08) with the comment "ensure positive
+                # for demo". A bypass that does not help now reports <= 0.
+                "rgs": round(rgs, 4) if rgs is not None else None,
+                "rgs_definition": "RI(attack, with bypass) - RI(attack, without bypass), "
+                                  "both measured against the same baseline graph",
+                "validation_outcome": (None if rgs is None
+                                       else "improves" if rgs > 0
+                                       else "no_change" if rgs == 0
+                                       else "degrades"),
+                "cost_estimate": None,
                 "action": "new_road"
             })
             
-    # Sort by RGS descending
-    recs.sort(key=lambda x: x["rgs"], reverse=True)
+    # Sort by measured RGS descending. Recommendations with no measurable or a
+    # negative gain remain in the list: suppressing them would reintroduce the
+    # "every recommendation helps" property by another route.
+    recs.sort(key=lambda x: (x["rgs"] is None, -(x["rgs"] or 0)))
     return recs

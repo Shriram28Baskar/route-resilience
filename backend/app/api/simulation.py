@@ -840,25 +840,47 @@ def simulate_investment(req: SimulateInvestmentRequest):
             dist = ((n1_data.get('x', 0) - n2_data.get('x', 0))**2 + (n1_data.get('y', 0) - n2_data.get('y', 0))**2)**0.5 * 111000
             G_projected.add_edge(n1, n2, weight=dist, length=dist, speed_kph=50, time_s=dist/(50*1000/3600))
     elif rec["type"] == "reinforcement":
-        # Target node cannot fail
-        if len(nodes) > 1:
-            target = random.choice([n for n in nodes if n != int(rec["target_node"])])
-        
-    pert_base = ablate_nodes(G, [target])
+        # Hardening means the target cannot fail, so the attack falls on the
+        # next-most-critical node instead. Previously this used an UNSEEDED
+        # random.choice, making the endpoint non-reproducible between calls.
+        hardened = int(rec["target_node"])
+        successors = [nid for nid, _ in ranked if nid != hardened]
+        target = successors[0] if successors else target
+
+    pert_base = ablate_nodes(G, [ranked[0][0] if ranked else target])
     pert_proj = ablate_nodes(G_projected, [target])
-    
-    ri_base = compute_resilience_index(G, pert_base)["resilience_index"] or 0
-    ri_proj = compute_resilience_index(G_projected, pert_proj)["resilience_index"] or 0
-    
-    projected_ri = max(ri_base, ri_proj + rec["rgs"])
-    actual_rgs = projected_ri - ri_base
-    
-    return JSONResponse({
+
+    # Both indices are measured against the SAME baseline graph G. Using
+    # G_projected as its own baseline gives the two a different denominator,
+    # so their difference would not be a gain.
+    ri_base = compute_resilience_index(G, pert_base)["resilience_index"]
+    ri_proj = compute_resilience_index(G, pert_proj)["resilience_index"]
+
+    # Previously: max(ri_base, ri_proj + rec["rgs"]) — which floored the
+    # projection at the baseline AND added a gain that ri_proj already
+    # contained. Reported as measured, including when the investment does not
+    # help.
+    measured_gain = (round(ri_proj - ri_base, 4)
+                     if (ri_base is not None and ri_proj is not None) else None)
+
+    prov = Provenance(status=MEASURED)
+    prov.inputs.append(graph_input(G))
+    prov.assume("a bypass is inserted as a straight-line edge at 50 km/h; "
+                "no engineering feasibility or costing is modelled")
+    prov.assume("hardening is modelled as the attack falling on the "
+                "next-most-critical node instead of the hardened one")
+    prov.note("Investments that do not help report rgs <= 0.")
+
+    return JSONResponse(with_provenance({
         "baseline_ri": ri_base,
-        "projected_ri": projected_ri,
-        "rgs": actual_rgs,
-        "recommendation": rec
-    })
+        "projected_ri": ri_proj,
+        "rgs": measured_gain,
+        "validation_outcome": (None if measured_gain is None
+                               else "improves" if measured_gain > 0
+                               else "no_change" if measured_gain == 0
+                               else "degrades"),
+        "recommendation": rec,
+    }, prov))
 
 @router.post("/timeline")
 def timeline(req: TimelineRequest):

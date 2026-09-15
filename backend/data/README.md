@@ -89,11 +89,28 @@ fingerprint. A cache whose fingerprint does not match the loaded graph is
 Use strict mode in CI and any reproducibility run, where silently recomputing
 would hide a provenance error.
 
-> The criticality pickle currently committed to this repository predates
-> fingerprinting. It carries no `graph_fingerprint` key and is therefore
-> **rejected on load**. It is retained only as a record of the 13,486-node /
-> 19,117-edge network the earlier README figures were computed from. Do not
-> cite it as a result.
+> **The criticality pickle committed here is not a result and not a graph.**
+>
+> `graphs/osm_fallback_criticality.pickle` predates fingerprinting. It carries no
+> `graph_fingerprint` key and is therefore **rejected on load**. It holds
+> betweenness/closeness scores for 13,486 node IDs and 19,117 edge keys, with no
+> record of which AOI, OSMnx version or date produced them. Do not cite it.
+>
+> **On the "Bengaluru topology proxy."** Development reports in this repository
+> reference a 13,486-node graph reconstructed from that pickle's
+> *edge-betweenness keys*. To be unambiguous about what that object is:
+>
+> * it has the **node and edge set** of the original network;
+> * it has **no edge lengths, no travel times, no speed limits, no geometry and
+>   no coordinates** — all were assigned uniform placeholder values;
+> * it is therefore **NOT the Bengaluru road graph**, and no distance-, time- or
+>   centrality-weighted result computed on it is a result about Bengaluru.
+>
+> It was used for exactly one purpose: counting how often the route endpoint
+> injected a fabricated failure, which depends on topology alone. Every other
+> measurement in those reports was run on the declared synthetic fixtures in
+> `backend/tests/conftest.py`. **No measurement on the real Bengaluru road
+> network exists in this repository.**
 
 ## Reproducing a run
 

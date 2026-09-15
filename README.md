@@ -105,6 +105,10 @@ These are design intentions, not delivered capabilities.
 
 ## Claim status
 
+A full classified inventory of every number in this repository —
+MEASURED / DERIVED / SYNTHETIC / ILLUSTRATIVE / UNSUPPORTED — is in
+[`CLAIMS.md`](CLAIMS.md).
+
 **Every previously published benchmark in this README has been withdrawn.** None
 could be regenerated from code or data in this repository.
 
