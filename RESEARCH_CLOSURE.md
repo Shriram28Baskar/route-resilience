@@ -206,19 +206,23 @@ collected: live defects found and removed, and a reproducible harness left behin
 
 ## 8. Artifact inventory
 
-### Commits (branch `claude/youthful-allen-j77qi5`)
+### Commits, in order
 
-| Commit | Content |
+| # | Content |
 |---|---|
-| `bd5a916` | P0 — clamps removed, route crash fixed, RI explicit, ML quarantined |
-| `f8f2324` | P1 — provenance, fingerprinting, build hygiene, core tests |
-| `a1e889e` | P1 completion — UI provenance, surviving RGS clamps, claim audit |
-| `5a5ae27` | P2.0/P2.2 partial — scripts, frozen scenarios, A5 synth, A7 |
-| `658e2a0` | ignore raw outputs while in flight |
-| `7a61031` | P2.0 complete — A5 on the 13,486-node proxy |
-| `1819cec` | P2.2 — raw intervention outputs + pre-registered aggregate |
-| `13bfc08` | P2.2 — post-hoc relative-k aggregate (separate, never merged) |
-| `2c336b6` | Post-mortem — H2 mechanism + A5 ρ/top-K trap |
+| 1 | P0 — clamps removed, route crash fixed, RI explicit, ML quarantined |
+| 2 | P1 — provenance, fingerprinting, build hygiene, core tests |
+| 3 | P1 completion — UI provenance, surviving RGS clamps, claim audit |
+| 4 | P2.0/P2.2 partial — scripts, frozen scenarios, A5 synth, A7 |
+| 5 | ignore raw outputs while in flight |
+| 6 | P2.0 complete — A5 on the 13,486-node proxy |
+| 7 | P2.2 — raw intervention outputs + pre-registered aggregate |
+| 8 | P2.2 — post-hoc relative-k aggregate (separate, never merged) |
+| 9 | Post-mortem — H2 mechanism + A5 ρ/top-K trap |
+| 10 | Research closure (this document) |
+
+Artifact hashes below are the durable identifiers; they are independent of
+commit SHAs and verify with `sha256sum`.
 
 ### Experimental artifacts (SHA-256, first 16 hex)
 
