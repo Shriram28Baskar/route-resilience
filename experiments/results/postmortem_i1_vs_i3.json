@@ -1,0 +1,5035 @@
+{
+ "type": "post_mortem_diagnostic",
+ "status": "READ-ONLY replay of frozen scenarios. Not an experiment, no new claim.",
+ "sample_size": 120,
+ "sampled_from": "253 partitioned scenarios (pre-registered set)",
+ "summary": {
+  "I1_route_resilience": {
+   "label": "I1",
+   "n_edges": 158,
+   "median_length_m": 1454.8,
+   "mean_length_m": 1445.0,
+   "max_length_m": 3198.3,
+   "frac_bridging_two_components": 1.0,
+   "median_endpoint_degree": 4.0,
+   "frac_over_500m": 0.962,
+   "frac_over_1000m": 0.7405,
+   "frac_over_2000m": 0.1392
+  },
+  "I3_nearest_gap": {
+   "label": "I3",
+   "n_edges": 158,
+   "median_length_m": 556.7,
+   "mean_length_m": 664.9,
+   "max_length_m": 2097.9,
+   "frac_bridging_two_components": 1.0,
+   "median_endpoint_degree": 4.0,
+   "frac_over_500m": 0.7089,
+   "frac_over_1000m": 0.1962,
+   "frac_over_2000m": 0.0063
+  }
+ },
+ "records": [
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k10|38",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    36,
+    2
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "41",
+     "length_m": 1618.4,
+     "deg_u": 6,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "53",
+     "v": "41",
+     "length_m": 565.4,
+     "deg_u": 5,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k5|31",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    42,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "63",
+     "length_m": 1088.6,
+     "deg_u": 6,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "52",
+     "v": "63",
+     "length_m": 561.6,
+     "deg_u": 5,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S3_random|k20|26",
+   "graph": "geometric_497",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    476,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "205",
+     "v": "41",
+     "length_m": 1514.3,
+     "deg_u": 17,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "430",
+     "v": "41",
+     "length_m": 427.2,
+     "deg_u": 13,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|36",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 3,
+   "component_sizes": [
+    128,
+    47,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "108",
+     "v": "8",
+     "length_m": 899.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "8",
+     "v": "106",
+     "length_m": 1402.2,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "108",
+     "v": "13",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "126",
+     "v": "106",
+     "length_m": 315.9,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k10|28",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    185,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "11",
+     "v": "342",
+     "length_m": 2351.3,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "211",
+     "v": "342",
+     "length_m": 706.4,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|35",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 4,
+   "component_sizes": [
+    17,
+    14,
+    4,
+    3
+   ],
+   "I1_edges": [
+    {
+     "u": "20",
+     "v": "70",
+     "length_m": 1476.6,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "70",
+     "v": "0",
+     "length_m": 611.6,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "0",
+     "v": "41",
+     "length_m": 1618.4,
+     "deg_u": 3,
+     "deg_v": 2,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "30",
+     "v": "53",
+     "length_m": 1070.2,
+     "deg_u": 6,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "10",
+     "v": "0",
+     "length_m": 611.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "30",
+     "v": "44",
+     "length_m": 565.4,
+     "deg_u": 6,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k5|46",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    147,
+    44
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "310",
+     "length_m": 2897.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "328",
+     "length_m": 1302.5,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k5|27",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    147,
+    44
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "310",
+     "length_m": 2897.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "321",
+     "length_m": 1298.7,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k20|29",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    131,
+    45
+   ],
+   "I1_edges": [
+    {
+     "u": "108",
+     "v": "8",
+     "length_m": 899.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "108",
+     "v": "13",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k20|0",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    127,
+    49
+   ],
+   "I1_edges": [
+    {
+     "u": "112",
+     "v": "8",
+     "length_m": 1298.7,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "139",
+     "v": "41",
+     "length_m": 699.3,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k5|20",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    145,
+    46
+   ],
+   "I1_edges": [
+    {
+     "u": "108",
+     "v": "8",
+     "length_m": 899.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "129",
+     "v": "34",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "radial_25|S3_random|k5|35",
+   "graph": "radial_25",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    19,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "24",
+     "v": "23",
+     "length_m": 1198.7,
+     "deg_u": 7,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "7",
+     "v": "23",
+     "length_m": 799.2,
+     "deg_u": 2,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S4_spatial|k5|43",
+   "graph": "geometric_497",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    487,
+    5
+   ],
+   "I1_edges": [
+    {
+     "u": "25",
+     "v": "101",
+     "length_m": 807.1,
+     "deg_u": 17,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "369",
+     "v": "101",
+     "length_m": 300.9,
+     "deg_u": 13,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k10|25",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    141,
+    45
+   ],
+   "I1_edges": [
+    {
+     "u": "108",
+     "v": "8",
+     "length_m": 899.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "129",
+     "v": "34",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k10|25",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    34,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "42",
+     "length_m": 1638.4,
+     "deg_u": 6,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "30",
+     "v": "43",
+     "length_m": 556.7,
+     "deg_u": 6,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S4_spatial|k20|13",
+   "graph": "geometric_497",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    476,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "205",
+     "v": "41",
+     "length_m": 1514.3,
+     "deg_u": 17,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "79",
+     "v": "41",
+     "length_m": 966.4,
+     "deg_u": 12,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|48",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 3,
+   "component_sizes": [
+    83,
+    49,
+    44
+   ],
+   "I1_edges": [
+    {
+     "u": "210",
+     "v": "129",
+     "length_m": 1139.0,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "129",
+     "v": "8",
+     "length_m": 947.7,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "235",
+     "v": "148",
+     "length_m": 315.9,
+     "deg_u": 3,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "235",
+     "v": "34",
+     "length_m": 1202.9,
+     "deg_u": 3,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|45",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 3,
+   "component_sizes": [
+    88,
+    87,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "212",
+     "v": "8",
+     "length_m": 2197.8,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "8",
+     "v": "3",
+     "length_m": 223.4,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "221",
+     "v": "126",
+     "length_m": 399.6,
+     "deg_u": 3,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "207",
+     "v": "3",
+     "length_m": 1501.8,
+     "deg_u": 3,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|22",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 4,
+   "component_sizes": [
+    15,
+    10,
+    9,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "25",
+     "v": "0",
+     "length_m": 1224.5,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "0",
+     "v": "55",
+     "length_m": 1491.6,
+     "deg_u": 5,
+     "deg_v": 5,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "55",
+     "v": "10",
+     "length_m": 1631.5,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "20",
+     "v": "3",
+     "length_m": 1088.6,
+     "deg_u": 5,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "40",
+     "v": "53",
+     "length_m": 556.7,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "22",
+     "v": "13",
+     "length_m": 556.5,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k5|8",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    27,
+    16
+   ],
+   "I1_edges": [
+    {
+     "u": "10",
+     "v": "65",
+     "length_m": 1530.2,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "40",
+     "v": "53",
+     "length_m": 556.7,
+     "deg_u": 5,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|7",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 4,
+   "component_sizes": [
+    14,
+    11,
+    9,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "20",
+     "v": "75",
+     "length_m": 1626.5,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "75",
+     "v": "55",
+     "length_m": 1356.3,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "55",
+     "v": "40",
+     "length_m": 663.4,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "11",
+     "v": "3",
+     "length_m": 573.8,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "30",
+     "v": "53",
+     "length_m": 1070.2,
+     "deg_u": 3,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "30",
+     "v": "43",
+     "length_m": 556.7,
+     "deg_u": 3,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S4_spatial|k20|2",
+   "graph": "geometric_497",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    476,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "25",
+     "v": "190",
+     "length_m": 1353.4,
+     "deg_u": 17,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "383",
+     "v": "190",
+     "length_m": 1179.6,
+     "deg_u": 14,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|33",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 5,
+   "component_sizes": [
+    89,
+    47,
+    38,
+    1,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "10",
+     "v": "308",
+     "length_m": 2497.5,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "308",
+     "v": "211",
+     "length_m": 599.4,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "211",
+     "v": "0",
+     "length_m": 2200.1,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "140",
+     "v": "335",
+     "length_m": 1298.7,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "140",
+     "v": "235",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "15",
+     "v": "0",
+     "length_m": 223.4,
+     "deg_u": 3,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k5|21",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    42,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "5",
+     "v": "72",
+     "length_m": 789.6,
+     "deg_u": 6,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "0",
+     "v": "72",
+     "length_m": 678.1,
+     "deg_u": 5,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|35",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    89,
+    87
+   ],
+   "I1_edges": [
+    {
+     "u": "15",
+     "v": "208",
+     "length_m": 1801.0,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "140",
+     "v": "235",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "grid_400|S4_spatial|k20|6",
+   "graph": "grid_400",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    379,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "21",
+     "v": "380",
+     "length_m": 1800.8,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "61",
+     "v": "380",
+     "length_m": 1601.3,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|41",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    175,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "3",
+     "length_m": 223.4,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "18",
+     "v": "3",
+     "length_m": 223.4,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k5|15",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    141,
+    50
+   ],
+   "I1_edges": [
+    {
+     "u": "109",
+     "v": "8",
+     "length_m": 999.0,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "136",
+     "v": "41",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k20|4",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    129,
+    47
+   ],
+   "I1_edges": [
+    {
+     "u": "111",
+     "v": "8",
+     "length_m": 1198.8,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "138",
+     "v": "41",
+     "length_m": 599.4,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|34",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    132,
+    44
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "309",
+     "length_m": 2797.2,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "233",
+     "v": "321",
+     "length_m": 411.9,
+     "deg_u": 4,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|7",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    175,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "242",
+     "length_m": 1770.2,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "140",
+     "v": "242",
+     "length_m": 411.9,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k5|24",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    27,
+    16
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "45",
+     "length_m": 1639.4,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "30",
+     "v": "43",
+     "length_m": 556.7,
+     "deg_u": 4,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k10|34",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    99,
+    87
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "211",
+     "length_m": 2097.9,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "236",
+     "length_m": 538.0,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k5|11",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 3,
+   "component_sizes": [
+    22,
+    11,
+    10
+   ],
+   "I1_edges": [
+    {
+     "u": "20",
+     "v": "75",
+     "length_m": 1626.5,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "75",
+     "v": "55",
+     "length_m": 1356.3,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "11",
+     "v": "3",
+     "length_m": 573.8,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "40",
+     "v": "53",
+     "length_m": 556.7,
+     "deg_u": 5,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|21",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    30,
+    8
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "35",
+     "length_m": 1545.1,
+     "deg_u": 6,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "53",
+     "v": "40",
+     "length_m": 556.7,
+     "deg_u": 3,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|6",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 4,
+   "component_sizes": [
+    14,
+    11,
+    8,
+    5
+   ],
+   "I1_edges": [
+    {
+     "u": "50",
+     "v": "30",
+     "length_m": 1130.1,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "30",
+     "v": "0",
+     "length_m": 1476.7,
+     "deg_u": 6,
+     "deg_v": 4,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "0",
+     "v": "10",
+     "length_m": 611.6,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "43",
+     "v": "30",
+     "length_m": 556.7,
+     "deg_u": 2,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "65",
+     "v": "73",
+     "length_m": 594.5,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "63",
+     "v": "10",
+     "length_m": 1421.4,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|40",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 5,
+   "component_sizes": [
+    10,
+    10,
+    9,
+    5,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "35",
+     "length_m": 1545.1,
+     "deg_u": 5,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "35",
+     "v": "60",
+     "length_m": 1635.3,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "60",
+     "v": "10",
+     "length_m": 1476.6,
+     "deg_u": 5,
+     "deg_v": 4,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "3",
+     "v": "30",
+     "length_m": 1454.8,
+     "deg_u": 4,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "73",
+     "v": "64",
+     "length_m": 594.8,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "3",
+     "v": "10",
+     "length_m": 556.7,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k10|32",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    98,
+    88
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "211",
+     "length_m": 2097.9,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "229",
+     "length_m": 509.4,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S4_spatial|k10|23",
+   "graph": "geometric_497",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    482,
+    5
+   ],
+   "I1_edges": [
+    {
+     "u": "25",
+     "v": "265",
+     "length_m": 1092.6,
+     "deg_u": 17,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "375",
+     "v": "269",
+     "length_m": 229.5,
+     "deg_u": 13,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|15",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    88,
+    88
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "208",
+     "length_m": 1798.2,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "140",
+     "v": "214",
+     "length_m": 499.5,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k5|32",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    42,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "53",
+     "length_m": 1454.8,
+     "deg_u": 6,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "40",
+     "v": "53",
+     "length_m": 556.7,
+     "deg_u": 6,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k10|41",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    34,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "42",
+     "length_m": 1638.4,
+     "deg_u": 6,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "30",
+     "v": "43",
+     "length_m": 556.7,
+     "deg_u": 6,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k10|13",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    139,
+    47
+   ],
+   "I1_edges": [
+    {
+     "u": "10",
+     "v": "310",
+     "length_m": 2697.3,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "208",
+     "v": "300",
+     "length_m": 805.4,
+     "deg_u": 4,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k20|28",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    147,
+    29
+   ],
+   "I1_edges": [
+    {
+     "u": "108",
+     "v": "8",
+     "length_m": 899.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "108",
+     "v": "13",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k10|4",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    34,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "24",
+     "length_m": 1195.0,
+     "deg_u": 6,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "13",
+     "v": "22",
+     "length_m": 556.5,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "radial_25|S3_random|k5|41",
+   "graph": "radial_25",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    19,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "22",
+     "length_m": 1440.7,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "6",
+     "v": "22",
+     "length_m": 799.1,
+     "deg_u": 1,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k10|28",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    36,
+    2
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "41",
+     "length_m": 1618.4,
+     "deg_u": 6,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "53",
+     "v": "41",
+     "length_m": 565.4,
+     "deg_u": 5,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k5|10",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    42,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "5",
+     "v": "72",
+     "length_m": 789.6,
+     "deg_u": 6,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "0",
+     "v": "72",
+     "length_m": 678.1,
+     "deg_u": 5,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k20|46",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    147,
+    29
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "326",
+     "length_m": 3103.3,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "321",
+     "length_m": 1298.7,
+     "deg_u": 4,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|33",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    20,
+    18
+   ],
+   "I1_edges": [
+    {
+     "u": "35",
+     "v": "10",
+     "length_m": 1136.6,
+     "deg_u": 5,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "35",
+     "v": "20",
+     "length_m": 561.6,
+     "deg_u": 5,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S5_targeted|k10|0",
+   "graph": "chokepoint_196",
+   "family": "S5_targeted",
+   "k": 10,
+   "n_components": 4,
+   "component_sizes": [
+    49,
+    49,
+    44,
+    44
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "308",
+     "length_m": 2697.3,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "308",
+     "v": "129",
+     "length_m": 1823.0,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "129",
+     "v": "209",
+     "length_m": 1043.0,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "41",
+     "v": "335",
+     "length_m": 2097.9,
+     "deg_u": 3,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "41",
+     "v": "135",
+     "length_m": 299.7,
+     "deg_u": 3,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "41",
+     "v": "235",
+     "length_m": 1198.8,
+     "deg_u": 3,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S3_random|k10|10",
+   "graph": "geometric_497",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    486,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "25",
+     "v": "41",
+     "length_m": 473.9,
+     "deg_u": 17,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "383",
+     "v": "41",
+     "length_m": 314.9,
+     "deg_u": 13,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k5|35",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    42,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "53",
+     "length_m": 1454.8,
+     "deg_u": 6,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "40",
+     "v": "53",
+     "length_m": 556.7,
+     "deg_u": 6,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k5|40",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    32,
+    11
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "25",
+     "length_m": 1224.5,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "13",
+     "v": "22",
+     "length_m": 556.5,
+     "deg_u": 4,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k20|2",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    98,
+    78
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "233",
+     "length_m": 2218.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "229",
+     "length_m": 509.4,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|6",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    175,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "10",
+     "v": "121",
+     "length_m": 631.8,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "136",
+     "v": "121",
+     "length_m": 223.4,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k20|41",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    130,
+    46
+   ],
+   "I1_edges": [
+    {
+     "u": "112",
+     "v": "8",
+     "length_m": 1298.7,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "137",
+     "v": "41",
+     "length_m": 499.5,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|31",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 4,
+   "component_sizes": [
+    20,
+    10,
+    4,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "45",
+     "length_m": 1639.4,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "45",
+     "v": "32",
+     "length_m": 679.0,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "32",
+     "v": "64",
+     "length_m": 1619.8,
+     "deg_u": 3,
+     "deg_v": 3,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "20",
+     "v": "43",
+     "length_m": 1088.6,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "20",
+     "v": "32",
+     "length_m": 571.2,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "73",
+     "v": "65",
+     "length_m": 594.5,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|2",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    32,
+    6
+   ],
+   "I1_edges": [
+    {
+     "u": "60",
+     "v": "0",
+     "length_m": 1130.2,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "11",
+     "v": "3",
+     "length_m": 573.8,
+     "deg_u": 3,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S4_spatial|k5|13",
+   "graph": "geometric_497",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    488,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "25",
+     "v": "381",
+     "length_m": 801.5,
+     "deg_u": 17,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "369",
+     "v": "101",
+     "length_m": 300.9,
+     "deg_u": 13,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k10|6",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    137,
+    49
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "308",
+     "length_m": 2697.3,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "321",
+     "length_m": 1298.7,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S3_random|k5|6",
+   "graph": "geometric_497",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    491,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "205",
+     "v": "41",
+     "length_m": 1514.3,
+     "deg_u": 17,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "383",
+     "v": "41",
+     "length_m": 314.9,
+     "deg_u": 13,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|21",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 3,
+   "component_sizes": [
+    88,
+    44,
+    44
+   ],
+   "I1_edges": [
+    {
+     "u": "109",
+     "v": "9",
+     "length_m": 899.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "9",
+     "v": "312",
+     "length_m": 2997.0,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "136",
+     "v": "41",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "240",
+     "v": "335",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k5|35",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    27,
+    16
+   ],
+   "I1_edges": [
+    {
+     "u": "20",
+     "v": "65",
+     "length_m": 1702.3,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "40",
+     "v": "53",
+     "length_m": 556.7,
+     "deg_u": 5,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S4_spatial|k20|3",
+   "graph": "geometric_497",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    432,
+    45
+   ],
+   "I1_edges": [
+    {
+     "u": "205",
+     "v": "450",
+     "length_m": 1978.1,
+     "deg_u": 17,
+     "deg_v": 11,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "369",
+     "v": "101",
+     "length_m": 300.9,
+     "deg_u": 13,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k10|43",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    185,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "306",
+     "length_m": 3198.3,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "112",
+     "v": "306",
+     "length_m": 1900.7,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k10|1",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    35,
+    3
+   ],
+   "I1_edges": [
+    {
+     "u": "20",
+     "v": "72",
+     "length_m": 1678.9,
+     "deg_u": 6,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "65",
+     "v": "71",
+     "length_m": 626.5,
+     "deg_u": 5,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|34",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 3,
+   "component_sizes": [
+    23,
+    11,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "50",
+     "length_m": 1476.7,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "50",
+     "v": "64",
+     "length_m": 674.7,
+     "deg_u": 6,
+     "deg_v": 3,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "30",
+     "v": "43",
+     "length_m": 556.7,
+     "deg_u": 3,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "70",
+     "v": "64",
+     "length_m": 565.5,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k5|36",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    39,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "11",
+     "length_m": 632.6,
+     "deg_u": 6,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "22",
+     "v": "13",
+     "length_m": 556.5,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k20|12",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    98,
+    78
+   ],
+   "I1_edges": [
+    {
+     "u": "208",
+     "v": "8",
+     "length_m": 1798.2,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "208",
+     "v": "110",
+     "length_m": 699.3,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S4_spatial|k20|43",
+   "graph": "geometric_497",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    475,
+    2
+   ],
+   "I1_edges": [
+    {
+     "u": "25",
+     "v": "470",
+     "length_m": 1268.9,
+     "deg_u": 17,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "383",
+     "v": "470",
+     "length_m": 1095.2,
+     "deg_u": 14,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k20|11",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    98,
+    78
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "226",
+     "length_m": 2206.8,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "228",
+     "length_m": 411.9,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|23",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    91,
+    85
+   ],
+   "I1_edges": [
+    {
+     "u": "208",
+     "v": "9",
+     "length_m": 1698.3,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "200",
+     "v": "112",
+     "length_m": 411.9,
+     "deg_u": 3,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|29",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    90,
+    86
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "209",
+     "length_m": 1898.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "221",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k5|21",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    147,
+    44
+   ],
+   "I1_edges": [
+    {
+     "u": "108",
+     "v": "8",
+     "length_m": 899.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "115",
+     "v": "20",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S3_random|k5|22",
+   "graph": "geometric_497",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    491,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "25",
+     "v": "41",
+     "length_m": 473.9,
+     "deg_u": 17,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "383",
+     "v": "41",
+     "length_m": 314.9,
+     "deg_u": 13,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|5",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    25,
+    13
+   ],
+   "I1_edges": [
+    {
+     "u": "30",
+     "v": "0",
+     "length_m": 1476.7,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "21",
+     "v": "13",
+     "length_m": 565.4,
+     "deg_u": 2,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S4_spatial|k10|41",
+   "graph": "geometric_497",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    485,
+    2
+   ],
+   "I1_edges": [
+    {
+     "u": "25",
+     "v": "470",
+     "length_m": 1268.9,
+     "deg_u": 17,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "383",
+     "v": "470",
+     "length_m": 1095.2,
+     "deg_u": 14,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k5|18",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    42,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "52",
+     "length_m": 1517.4,
+     "deg_u": 6,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "63",
+     "v": "52",
+     "length_m": 561.6,
+     "deg_u": 5,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k10|28",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    148,
+    38
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "311",
+     "length_m": 2997.0,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "328",
+     "length_m": 1302.5,
+     "deg_u": 4,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k5|24",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    42,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "63",
+     "length_m": 1088.6,
+     "deg_u": 6,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "52",
+     "v": "63",
+     "length_m": 561.6,
+     "deg_u": 5,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k10|20",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    185,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "142",
+     "length_m": 942.4,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "40",
+     "v": "142",
+     "length_m": 411.9,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|3",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 4,
+   "component_sizes": [
+    90,
+    46,
+    39,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "111",
+     "v": "8",
+     "length_m": 1198.8,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "8",
+     "v": "311",
+     "length_m": 2997.0,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "311",
+     "v": "302",
+     "length_m": 223.4,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "114",
+     "v": "13",
+     "length_m": 315.9,
+     "deg_u": 3,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "240",
+     "v": "335",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "219",
+     "v": "302",
+     "length_m": 631.8,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|36",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 3,
+   "component_sizes": [
+    28,
+    6,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "30",
+     "v": "0",
+     "length_m": 1476.7,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "0",
+     "v": "11",
+     "length_m": 632.6,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "73",
+     "v": "0",
+     "length_m": 556.7,
+     "deg_u": 2,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "21",
+     "v": "13",
+     "length_m": 565.4,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k10|31",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    34,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "42",
+     "length_m": 1638.4,
+     "deg_u": 6,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "30",
+     "v": "43",
+     "length_m": 556.7,
+     "deg_u": 6,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k5|8",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    42,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "53",
+     "length_m": 1454.8,
+     "deg_u": 6,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "40",
+     "v": "53",
+     "length_m": 556.7,
+     "deg_u": 6,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|16",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    24,
+    14
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "50",
+     "length_m": 1476.7,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "30",
+     "v": "44",
+     "length_m": 565.4,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S3_random|k20|33",
+   "graph": "geometric_497",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    473,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "25",
+     "v": "381",
+     "length_m": 801.5,
+     "deg_u": 17,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "369",
+     "v": "101",
+     "length_m": 300.9,
+     "deg_u": 13,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k10|18",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    185,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "342",
+     "length_m": 2644.9,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "342",
+     "length_m": 1332.8,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k10|4",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    147,
+    39
+   ],
+   "I1_edges": [
+    {
+     "u": "108",
+     "v": "8",
+     "length_m": 899.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "115",
+     "v": "20",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k20|49",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    143,
+    33
+   ],
+   "I1_edges": [
+    {
+     "u": "108",
+     "v": "8",
+     "length_m": 899.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "108",
+     "v": "13",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k10|17",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    147,
+    39
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "311",
+     "length_m": 2997.0,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "328",
+     "length_m": 1302.5,
+     "deg_u": 4,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|11",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 3,
+   "component_sizes": [
+    25,
+    9,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "20",
+     "v": "50",
+     "length_m": 1476.6,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "50",
+     "v": "64",
+     "length_m": 674.7,
+     "deg_u": 6,
+     "deg_v": 3,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "30",
+     "v": "43",
+     "length_m": 556.7,
+     "deg_u": 5,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "73",
+     "v": "65",
+     "length_m": 594.5,
+     "deg_u": 3,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k5|40",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    42,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "5",
+     "v": "73",
+     "length_m": 763.7,
+     "deg_u": 6,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "0",
+     "v": "73",
+     "length_m": 556.7,
+     "deg_u": 5,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k5|18",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 3,
+   "component_sizes": [
+    23,
+    11,
+    9
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "35",
+     "length_m": 1545.1,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "35",
+     "v": "15",
+     "length_m": 1356.2,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "53",
+     "v": "40",
+     "length_m": 556.7,
+     "deg_u": 4,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "3",
+     "v": "11",
+     "length_m": 573.8,
+     "deg_u": 5,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k20|24",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    130,
+    46
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "309",
+     "length_m": 2797.2,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "328",
+     "length_m": 1302.5,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k10|30",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    36,
+    2
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "12",
+     "length_m": 678.1,
+     "deg_u": 6,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "3",
+     "v": "12",
+     "length_m": 618.1,
+     "deg_u": 5,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|12",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 4,
+   "component_sizes": [
+    22,
+    10,
+    4,
+    2
+   ],
+   "I1_edges": [
+    {
+     "u": "10",
+     "v": "35",
+     "length_m": 1136.6,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "35",
+     "v": "24",
+     "length_m": 650.0,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "24",
+     "v": "51",
+     "length_m": 1679.8,
+     "deg_u": 3,
+     "deg_v": 1,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "63",
+     "v": "40",
+     "length_m": 1088.6,
+     "deg_u": 5,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "13",
+     "v": "22",
+     "length_m": 556.5,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "63",
+     "v": "51",
+     "length_m": 573.9,
+     "deg_u": 5,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k10|33",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    36,
+    2
+   ],
+   "I1_edges": [
+    {
+     "u": "25",
+     "v": "1",
+     "length_m": 1307.3,
+     "deg_u": 6,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "74",
+     "v": "1",
+     "length_m": 617.8,
+     "deg_u": 5,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k5|16",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    32,
+    11
+   ],
+   "I1_edges": [
+    {
+     "u": "20",
+     "v": "75",
+     "length_m": 1626.5,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "11",
+     "v": "3",
+     "length_m": 573.8,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S3_random|k20|4",
+   "graph": "geometric_497",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    476,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "205",
+     "v": "190",
+     "length_m": 1480.3,
+     "deg_u": 17,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "383",
+     "v": "190",
+     "length_m": 1179.6,
+     "deg_u": 14,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k10|16",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    185,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "127",
+     "length_m": 1412.8,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "112",
+     "v": "127",
+     "length_m": 223.4,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k10|47",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    36,
+    2
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "41",
+     "length_m": 1618.4,
+     "deg_u": 6,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "53",
+     "v": "41",
+     "length_m": 565.4,
+     "deg_u": 5,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|19",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 3,
+   "component_sizes": [
+    25,
+    7,
+    6
+   ],
+   "I1_edges": [
+    {
+     "u": "60",
+     "v": "40",
+     "length_m": 1130.2,
+     "deg_u": 6,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "40",
+     "v": "20",
+     "length_m": 1130.2,
+     "deg_u": 4,
+     "deg_v": 5,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "53",
+     "v": "40",
+     "length_m": 556.7,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "10",
+     "v": "22",
+     "length_m": 594.4,
+     "deg_u": 3,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "geometric_497|S3_random|k5|0",
+   "graph": "geometric_497",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    491,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "25",
+     "v": "41",
+     "length_m": 473.9,
+     "deg_u": 17,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "383",
+     "v": "41",
+     "length_m": 314.9,
+     "deg_u": 13,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|23",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 3,
+   "component_sizes": [
+    21,
+    14,
+    3
+   ],
+   "I1_edges": [
+    {
+     "u": "30",
+     "v": "50",
+     "length_m": 1130.1,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "50",
+     "v": "72",
+     "length_m": 1367.8,
+     "deg_u": 6,
+     "deg_v": 2,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "30",
+     "v": "44",
+     "length_m": 565.4,
+     "deg_u": 6,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "0",
+     "v": "73",
+     "length_m": 556.7,
+     "deg_u": 4,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k5|7",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 2,
+   "component_sizes": [
+    144,
+    47
+   ],
+   "I1_edges": [
+    {
+     "u": "108",
+     "v": "8",
+     "length_m": 899.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "129",
+     "v": "34",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k10|41",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    185,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "242",
+     "length_m": 1770.2,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "126",
+     "v": "242",
+     "length_m": 499.5,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|24",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    25,
+    13
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "50",
+     "length_m": 1476.7,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "30",
+     "v": "43",
+     "length_m": 556.7,
+     "deg_u": 6,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k5|6",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 5,
+   "n_components": 3,
+   "component_sizes": [
+    23,
+    16,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "35",
+     "length_m": 1545.1,
+     "deg_u": 6,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "35",
+     "v": "51",
+     "length_m": 1359.6,
+     "deg_u": 6,
+     "deg_v": 3,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "13",
+     "v": "22",
+     "length_m": 556.5,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "63",
+     "v": "52",
+     "length_m": 561.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|32",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 4,
+   "component_sizes": [
+    21,
+    10,
+    4,
+    3
+   ],
+   "I1_edges": [
+    {
+     "u": "60",
+     "v": "35",
+     "length_m": 1635.3,
+     "deg_u": 6,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "35",
+     "v": "24",
+     "length_m": 650.0,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "24",
+     "v": "11",
+     "length_m": 698.0,
+     "deg_u": 3,
+     "deg_v": 2,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "53",
+     "v": "40",
+     "length_m": 556.7,
+     "deg_u": 3,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "3",
+     "v": "20",
+     "length_m": 1088.6,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "3",
+     "v": "11",
+     "length_m": 573.8,
+     "deg_u": 4,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|30",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    31,
+    7
+   ],
+   "I1_edges": [
+    {
+     "u": "50",
+     "v": "30",
+     "length_m": 1130.1,
+     "deg_u": 6,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "44",
+     "v": "30",
+     "length_m": 565.4,
+     "deg_u": 2,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k20|44",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    147,
+    29
+   ],
+   "I1_edges": [
+    {
+     "u": "108",
+     "v": "8",
+     "length_m": 899.1,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "122",
+     "v": "27",
+     "length_m": 399.6,
+     "deg_u": 4,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S4_spatial|k10|39",
+   "graph": "chokepoint_196",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    98,
+    88
+   ],
+   "I1_edges": [
+    {
+     "u": "208",
+     "v": "8",
+     "length_m": 1798.2,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "215",
+     "v": "119",
+     "length_m": 499.5,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "chokepoint_196|S3_random|k20|49",
+   "graph": "chokepoint_196",
+   "family": "S3_random",
+   "k": 20,
+   "n_components": 2,
+   "component_sizes": [
+    90,
+    86
+   ],
+   "I1_edges": [
+    {
+     "u": "8",
+     "v": "208",
+     "length_m": 1798.2,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "133",
+     "v": "221",
+     "length_m": 411.9,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|18",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 4,
+   "component_sizes": [
+    14,
+    10,
+    10,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "40",
+     "v": "5",
+     "length_m": 1879.1,
+     "deg_u": 5,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "5",
+     "v": "65",
+     "length_m": 1356.2,
+     "deg_u": 5,
+     "deg_v": 5,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "65",
+     "v": "24",
+     "length_m": 1838.9,
+     "deg_u": 5,
+     "deg_v": 3,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "31",
+     "v": "10",
+     "length_m": 1128.2,
+     "deg_u": 3,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "52",
+     "v": "63",
+     "length_m": 561.6,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "35",
+     "v": "21",
+     "length_m": 634.1,
+     "deg_u": 4,
+     "deg_v": 3,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "grid_400|S4_spatial|k10|44",
+   "graph": "grid_400",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    389,
+    1
+   ],
+   "I1_edges": [
+    {
+     "u": "21",
+     "v": "380",
+     "length_m": 1800.8,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "61",
+     "v": "380",
+     "length_m": 1601.3,
+     "deg_u": 4,
+     "deg_v": 0,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k10|27",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    35,
+    3
+   ],
+   "I1_edges": [
+    {
+     "u": "20",
+     "v": "72",
+     "length_m": 1678.9,
+     "deg_u": 6,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "65",
+     "v": "71",
+     "length_m": 626.5,
+     "deg_u": 5,
+     "deg_v": 2,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S4_spatial|k10|45",
+   "graph": "ring_of_cliques_48",
+   "family": "S4_spatial",
+   "k": 10,
+   "n_components": 2,
+   "component_sizes": [
+    36,
+    2
+   ],
+   "I1_edges": [
+    {
+     "u": "0",
+     "v": "25",
+     "length_m": 1224.5,
+     "deg_u": 6,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "13",
+     "v": "22",
+     "length_m": 556.5,
+     "deg_u": 5,
+     "deg_v": 1,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    }
+   ]
+  },
+  {
+   "scenario_id": "ring_of_cliques_48|S3_random|k10|39",
+   "graph": "ring_of_cliques_48",
+   "family": "S3_random",
+   "k": 10,
+   "n_components": 5,
+   "component_sizes": [
+    12,
+    12,
+    5,
+    5,
+    4
+   ],
+   "I1_edges": [
+    {
+     "u": "15",
+     "v": "45",
+     "length_m": 1772.0,
+     "deg_u": 5,
+     "deg_v": 6,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "45",
+     "v": "64",
+     "length_m": 1257.4,
+     "deg_u": 6,
+     "deg_v": 4,
+     "comp_u": 1,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "64",
+     "v": "71",
+     "length_m": 652.3,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 2,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ],
+   "I3_edges": [
+    {
+     "u": "30",
+     "v": "43",
+     "length_m": 556.7,
+     "deg_u": 2,
+     "deg_v": 5,
+     "comp_u": 0,
+     "comp_v": 1,
+     "bridges_components": true
+    },
+    {
+     "u": "10",
+     "v": "63",
+     "length_m": 1421.4,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 2,
+     "bridges_components": true
+    },
+    {
+     "u": "10",
+     "v": "73",
+     "length_m": 1070.2,
+     "deg_u": 4,
+     "deg_v": 4,
+     "comp_u": 0,
+     "comp_v": 3,
+     "bridges_components": true
+    }
+   ]
+  }
+ ]
+}
