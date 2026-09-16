@@ -530,7 +530,10 @@ export interface EquityMetricsResponse {
 
 export interface TrafficImpactResponse {
   ablated_count: number;
-  affected_daily_trips: number;
+  /** M11: renamed from affected_daily_trips. DERIVED, not measured — a city-wide
+   *  commuter constant scaled by a relative betweenness ratio. Not a trip count. */
+  derived_trip_scale: number;
+  max_relative_betweenness: number;
   avg_baseline_trip_m: number;
   avg_perturbed_trip_m: number;
   avg_detour_km: number;

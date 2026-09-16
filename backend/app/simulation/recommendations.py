@@ -226,7 +226,13 @@ def generate_dynamic_prescriptions(
                         # positive gain. Measured value reported as-is.
                         "rgs": round(gain, 6),
                         "ri_before": round(baseline_ri, 4),
+                        # DERIVED IDENTITY, not an independent measurement: this is exactly
+                        # baseline_ri + gain, where gain was measured by _ri_gain().
+                        # It restates the measured gain; it is not a second simulation
+                        # of the hardened network. Arithmetic unchanged.
                         "ri_after": round(baseline_ri + gain, 4),
+                        "ri_after_definition": ("derived identity ri_before + measured rgs; "
+                                                "not an independently simulated post-intervention index"),
                         "is_articulation_point": n1_is_ap,
                         # M8 (removed): protects_residents was nodes x betweenness x 50.
                         # Betweenness is a path count, not people, and no census
@@ -277,14 +283,8 @@ def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * 2 * math.asin(math.sqrt(max(0.0, a)))
 
 
-def _cost_estimate(dist_m: float, road_type: str = "bypass") -> str:
-    """Rough construction cost estimate based on bypass length."""
-    if dist_m < 500:
-        return "Low — requires 1 road bridge or bypass"
-    elif dist_m < 1500:
-        return "Medium — requires 1 road bridge or bypass"
-    else:
-        return "High — major corridor construction"
+# M8: _cost_estimate() removed. It returned unsourced rupee-crore literals keyed
+# on link length; no costing model exists and every call site now reports None.
 
 
 def _ri_gain(
@@ -408,7 +408,13 @@ def generate_recommendations(G: nx.Graph) -> List[Dict[str, Any]]:
                         # positive gain. Measured value reported as-is.
                         "rgs": round(gain, 6),
                         "ri_before": round(baseline_ri, 4),
+                        # DERIVED IDENTITY, not an independent measurement: this is exactly
+                        # baseline_ri + gain, where gain was measured by _ri_gain().
+                        # It restates the measured gain; it is not a second simulation
+                        # of the hardened network. Arithmetic unchanged.
                         "ri_after": round(baseline_ri + gain, 4),
+                        "ri_after_definition": ("derived identity ri_before + measured rgs; "
+                                                "not an independently simulated post-intervention index"),
                         "is_articulation_point": n1_is_ap,
                         "protects_residents": protected_pop,
                         "cascade_prevention": baseline_partitioned,

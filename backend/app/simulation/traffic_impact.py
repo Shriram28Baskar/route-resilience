@@ -105,31 +105,58 @@ def compute_traffic_impact(
     avg_detour_m    = max(0, avg_perturbed_m - avg_baseline_m)
     detour_km       = avg_detour_m / 1000
 
-    # ── 2. Real Traffic Volume Impact (via Centrality) ───────────────────────
-    # Betweenness centrality perfectly represents the fraction of all shortest paths
-    # fraction of all shortest paths passing through a node. If we sum the centrality of ablated nodes, we get
-    # the exact mathematical fraction of city-wide traffic disrupted!
+    # ── 2. Topological disruption scale (NOT traffic) ────────────────────────
+    #
+    # M11. The previous version of this block claimed: "Betweenness centrality
+    # perfectly represents the fraction of all shortest paths passing through a
+    # node. If we sum the centrality of ablated nodes, we get the exact
+    # mathematical fraction of city-wide traffic disrupted!" Three things were
+    # wrong with that:
+    #
+    #   (a) it takes the MAX over ablated nodes, not the sum, as the code below
+    #       always did;
+    #   (b) `compute_betweenness` divides every score by the graph's maximum
+    #       (`all_centrality = {k: v / max_score}`), so what it returns is a
+    #       RELATIVE score in [0, 1] where the single most central node is 1.0
+    #       by construction, on every graph. It is not a fraction of anything;
+    #   (c) betweenness counts shortest PATHS between node pairs. It is not a
+    #       traffic flow. No origin-destination matrix or traffic count is used
+    #       anywhere in this module.
+    #
+    # A coefficient `*= 0.25` was applied here, commented "scale it back down to
+    # ~25% (the true mathematical max for the top node)", i.e. an attempt to undo
+    # (b) with a guessed constant. That guess is graph-dependent and was never
+    # measured on any graph. It has been REMOVED and deliberately NOT replaced
+    # with another coefficient.
+    #
+    # What is computed now is exactly:
+    #
+    #     max_relative_betweenness = max over ablated nodes n of
+    #                                    BC(n) / max_j BC(j)
+    #
+    # a dimensionless ratio in [0, 1] against the most central node of THIS
+    # graph. 1.0 means "the most central node was ablated". It is a topological
+    # severity indicator, NOT a share of trips, traffic, vehicles or people.
     from app.graph_pipeline.centrality import compute_betweenness
     centrality_scores = compute_betweenness(G)
-    
-    fraction_traffic_disrupted = 0.0
+
+    max_relative_betweenness = 0.0
     for n in ablated_set:
         try:
             n_int = int(n)
         except ValueError:
             n_int = n
         raw_score = float(centrality_scores.get(n, centrality_scores.get(n_int, 0.0)))
-        fraction_traffic_disrupted = max(fraction_traffic_disrupted, raw_score)
-        
-    # The centrality scores are re-normalized to max 1.0 for UI coloring.
-    # We scale it back down to ~25% (the true mathematical max for the top node).
-    fraction_traffic_disrupted *= 0.25
-        
-    # Cap at 1.0 (100% of traffic)
-    fraction_traffic_disrupted = min(1.0, fraction_traffic_disrupted)
-    
-    # Base daily commuters in the city
-    affected_trips = int(_BENGALURU_DAILY_COMMUTERS * fraction_traffic_disrupted)
+        max_relative_betweenness = max(max_relative_betweenness, raw_score)
+
+    # No cap is applied: compute_betweenness max-normalises, so the value is
+    # already in [0, 1] by construction and the previous min(1.0, ...) could
+    # never bind.
+
+    # DERIVED, NOT MEASURED: a city-wide commuter constant multiplied by a
+    # relative topological score. This is not a trip count and must not be read
+    # as one. The field it feeds is named accordingly.
+    derived_trip_scale = int(_BENGALURU_DAILY_COMMUTERS * max_relative_betweenness)
 
     # ── 3. Economic calculations ──────────────────────────────────────────────
     # Extra commute time per person
@@ -140,11 +167,14 @@ def compute_traffic_impact(
     # 2. Gridlock / Congestion Penalty
     # A failed central node causes severe local gridlock regardless of the detour path.
     # We add 10 to 45 minutes of base delay scaling with the criticality of the failure.
-    gridlock_minutes = fraction_traffic_disrupted * 300  # 15% disruption = 45 min delay
+    # DERIVED: an invented coefficient (300) applied to a relative topological
+    # score. Not calibrated against any congestion measurement. Declared, not removed,
+    # because removing it would require inventing a replacement.
+    gridlock_minutes = max_relative_betweenness * 300
     
     extra_minutes_per_commuter = detour_minutes + gridlock_minutes
 
-    total_commuter_minutes_lost = affected_trips * extra_minutes_per_commuter
+    total_commuter_minutes_lost = derived_trip_scale * extra_minutes_per_commuter
     total_commuter_hours_lost   = total_commuter_minutes_lost / 60
 
     # Person-days lost = total hours / 8h workday
@@ -154,7 +184,7 @@ def compute_traffic_impact(
     wage_loss_inr = total_commuter_hours_lost * _AVG_HOURLY_WAGE_INR
 
     # Fuel + vehicle costs for detour
-    fuel_loss_inr = affected_trips * detour_km * _DETOUR_PENALTY_PER_KM
+    fuel_loss_inr = derived_trip_scale * detour_km * _DETOUR_PENALTY_PER_KM
 
     # Logistics / goods transport premium (≈15% of total commuter base)
     logistics_loss_inr = (wage_loss_inr + fuel_loss_inr) * 0.15
@@ -168,7 +198,11 @@ def compute_traffic_impact(
 
     return {
         "ablated_count":               len(ablated_set),
-        "affected_daily_trips":        affected_trips,
+        # M11: renamed from "affected_daily_trips". The old name implied a measured
+        # count of disrupted journeys. It is a city-wide commuter constant scaled by
+        # a relative betweenness ratio, with no OD matrix and no traffic counts.
+        "derived_trip_scale":          derived_trip_scale,
+        "max_relative_betweenness":    round(max_relative_betweenness, 6),
         "avg_baseline_trip_m":         round(avg_baseline_m, 1),
         "avg_perturbed_trip_m":        round(avg_perturbed_m, 1),
         "avg_detour_km":               round(detour_km, 2),
@@ -182,4 +216,24 @@ def compute_traffic_impact(
         "logistics_loss_inr":          round(logistics_loss_inr),
         "total_economic_loss_inr":     round(total_economic_loss_inr),
         "annual_loss_projection_inr":  round(annual_loss_projection_inr),
+        "derived_trip_scale_definition": (
+            "_BENGALURU_DAILY_COMMUTERS (9,200,000, a constant) multiplied by "
+            "max_relative_betweenness. NOT a measured or estimated count of "
+            "disrupted journeys. No origin-destination matrix, traffic count or "
+            "survey is used anywhere in this module."
+        ),
+        "max_relative_betweenness_definition": (
+            "max over ablated nodes of BC(n) / max_j BC(j) on this graph. A "
+            "dimensionless ratio in [0,1] against the most central node; 1.0 means "
+            "the most central node was ablated. NOT a fraction of traffic."
+        ),
+        "model_assumptions": [
+            "betweenness counts shortest paths between node pairs, not vehicle flow",
+            "compute_betweenness max-normalises, so scores are relative to this graph",
+            "unreachable trips are penalised at 3x baseline distance (invented)",
+            "gridlock delay = max_relative_betweenness x 300 minutes (invented coefficient)",
+            "logistics premium = 15% of wage+fuel loss (invented coefficient)",
+            "wage 285 INR/h, detour 180 INR/km, 250 workdays/yr, 9.2M commuters: "
+            "all unsourced constants",
+        ],
     }

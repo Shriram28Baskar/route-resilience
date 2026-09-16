@@ -2181,7 +2181,8 @@ function TrafficImpactResults({ data }: { data: TrafficImpactResponse }) {
 
       <div className="grid grid-cols-2 gap-4">
         {[
-          { label: "Affected Daily Trips",  value: fmt(data.affected_daily_trips),         color: "#FFB400" },
+          { label: "Derived Trip Scale (not measured)", value: fmt(data.derived_trip_scale), color: "#FFB400" },
+          { label: "Max relative betweenness", value: data.max_relative_betweenness?.toFixed(3) ?? "—", color: "#9CA3AF" },
           { label: "Extra Min / Commuter",  value: `${data.extra_minutes_per_commuter} min`, color: "#FFB400" },
           { label: "Person-Days Lost",      value: fmt(Math.round(data.person_days_lost)), color: "#FF4444" },
           { label: "Unreachable Trip Pairs",value: `${data.unreachable_trip_pairs_pct}%`,  color: "#FF4444" },
