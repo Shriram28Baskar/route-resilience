@@ -517,11 +517,11 @@ def ablate_prescribe(req: PrescribeRequest):
             G_hardened_perturbed = ablate_nodes(G_hardened, target_nodes)
             ri_validated = compute_resilience_index(G, G_hardened_perturbed)
             validated_ri = round(ri_validated.get("resilience_index") or 0.0, 4)
-            
-            # Ensure mathematical consistency for demonstration: hardened network must have higher RI
-            if validated_ri <= attacked_ri:
-                validated_ri = min(0.99, attacked_ri + 0.025)
 
+            # M1 (removed): a floor `min(0.99, attacked_ri + 0.025)` previously
+            # overwrote validated_ri whenever the intervention did not help, so a
+            # counterfactual validation could never fail. The measured value is
+            # now reported as-is, including gain <= 0.
             gain_from_attacked = round(validated_ri - attacked_ri, 4)
             gain_from_baseline = round(validated_ri - attacked_ri, 4)
 
@@ -540,8 +540,14 @@ def ablate_prescribe(req: PrescribeRequest):
                 "new_resilience_index": validated_ri,
                 "rationale": f"Reconnects isolated zone of {isolated_count:,} nodes to main network",
                 "isolated_nodes": isolated_count,
-                "priority": "CRITICAL" if gain_from_attacked > 0.02 else "HIGH",
-                "cost_estimate": "Medium — requires 1 road bridge or bypass",
+                "priority": ("CRITICAL" if gain_from_attacked > 0.02
+                             else "HIGH" if gain_from_attacked > 0.0
+                             else "NO_MEASURED_BENEFIT"),
+                "validation_outcome": ("improves" if gain_from_attacked > 0.0
+                                       else "no_change" if gain_from_attacked == 0.0
+                                       else "degrades"),
+                # M8 (removed): unsourced rupee/dollar cost literal. No costing model exists.
+                "cost_estimate": None,
             })
     else:
         # Graph still connected — suggest reinforcing articulation points
@@ -574,8 +580,14 @@ def ablate_prescribe(req: PrescribeRequest):
                     "new_resilience_index": validated_ri,
                     "rationale": f"Adds redundant path around single-point-of-failure node #{ap}",
                     "isolated_nodes": 1,
-                    "priority": "HIGH",
-                    "cost_estimate": "Low — parallel road or pedestrian bridge",
+                    "priority": ("CRITICAL" if gain > 0.02
+                                 else "HIGH" if gain > 0.0
+                                 else "NO_MEASURED_BENEFIT"),
+                    "validation_outcome": ("improves" if gain > 0.0
+                                           else "no_change" if gain == 0.0
+                                           else "degrades"),
+                    # M8 (removed): unsourced cost literal.
+                    "cost_estimate": None,
                 })
             if len(suggestions) >= req.max_recommendations:
                 break
@@ -798,43 +810,36 @@ def route(req: RouteRequest):
     if req.ablated_node_ids:
         ablated_nodes = [node_map[nid] for nid in req.ablated_node_ids if nid in node_map]
 
-        # Deterministic infrastructure category tags for UI display
-        infra_types = [
-            "🚩 Critical Junction",
-            "🏥 Hospital Access",
-            "🚒 Fire Station Access",
-            "👮 Police Station Access",
-            "🏠 Residential Access",
+        # M8 (removed): infrastructure category tags were assigned round-robin by
+        # list index ("Hospital Access", "Fire Station Access", ...). No facility
+        # layer is joined anywhere, so the labels described nothing. Only the node
+        # id is reported now.
+        result["ablated_infra"] = [
+            {"node_id": nid} for nid in req.ablated_node_ids[:10]
         ]
-        ablated_infra = [
-            {"node_id": nid, "type": infra_types[i % len(infra_types)]}
-            for i, nid in enumerate(req.ablated_node_ids[:10])
-        ]
-        result["ablated_infra"] = ablated_infra
 
         perturbed = ablate_nodes(G, ablated_nodes)
         rerouted = compute_route(perturbed, src, tgt, weight_type=req.weight_type, num_alternatives=2)
         result["rerouted"] = rerouted
 
-        if baseline.get("distance_m") is not None and rerouted.get("distance_m") is not None:
-            bd, rd = baseline["distance_m"], rerouted["distance_m"]
-            
-            # HACKATHON DEMO GUARDRAIL:
-            # If the selected disaster didn't impact the route (rd == bd), we forcefully ablate
-            # a node directly on the path so the judges ALWAYS see a dynamic reroute in action.
-            if bd == rd and len(baseline.get("path_nodes", [])) > 3:
-                mid_node_str = baseline["path_nodes"][len(baseline["path_nodes"]) // 2]
-                if mid_node_str in node_map:
-                    forced_node = node_map[mid_node_str]
-                    ablated_nodes.append(forced_node)
-                    result["ablated_infra"].append({"node_id": mid_node_str, "type": "💥 Direct Route Failure"})
-                    
-                    # Re-compute with the forced failure
-                    perturbed = ablate_nodes(G, ablated_nodes)
-                    rerouted = compute_route(perturbed, src, tgt, weight_type=req.weight_type, num_alternatives=2)
-                    result["rerouted"] = rerouted
-                    rd = rerouted.get("distance_m", rd)
+        # M2 (removed): a "HACKATHON DEMO GUARDRAIL" block previously ablated an
+        # extra node ON the computed path whenever the caller's ablation did not
+        # change the route, then attributed the resulting detour to the caller's
+        # scenario. Measured at commit 83e6b5e on a 40-case sweep (chokepoint
+        # fixture, seed 7): it fired in 27/40 = 68% of single-node scenarios.
+        # The route is now reported exactly as computed.
+        baseline_reachable = baseline.get("distance_m") is not None
+        rerouted_reachable = rerouted.get("distance_m") is not None
+        result["baseline_reachable"] = baseline_reachable
+        result["rerouted_reachable"] = rerouted_reachable
+        result["comparison_status"] = (
+            "ok" if (baseline_reachable and rerouted_reachable)
+            else "severed_by_ablation" if baseline_reachable
+            else "unreachable_in_baseline"
+        )
 
+        if baseline_reachable and rerouted_reachable:
+            bd, rd = baseline["distance_m"], rerouted["distance_m"]
             bt, rt = baseline["travel_time_s"], rerouted["travel_time_s"]
             bn, rn = len(baseline["path_nodes"]), len(rerouted["path_nodes"])
             
@@ -967,7 +972,10 @@ def simulate_investment(req: SimulateInvestmentRequest):
     from app.graph_pipeline.centrality import compute_betweenness
     centrality = compute_betweenness(G, k=100)
     ranked = sorted(centrality.items(), key=lambda x: x[1], reverse=True)
-    target = ranked[0][0] if ranked else random.choice(nodes)
+    # M9 (fixed): random.choice was unseeded, so repeated calls could return
+    # different projections for the same request. Seeded for determinism.
+    _rng = random.Random(20260916)
+    target = ranked[0][0] if ranked else _rng.choice(sorted(nodes))
     
     G_projected = G.copy()
     if rec["type"] == "bypass":
@@ -980,21 +988,34 @@ def simulate_investment(req: SimulateInvestmentRequest):
     elif rec["type"] == "reinforcement":
         # Target node cannot fail
         if len(nodes) > 1:
-            target = random.choice([n for n in nodes if n != int(rec["target_node"])])
+            target = _rng.choice(sorted(n for n in nodes if n != int(rec["target_node"])))
         
     pert_base = ablate_nodes(G, [target])
     pert_proj = ablate_nodes(G_projected, [target])
-    
+
+    # M9 (fixed): both indices are now measured against the SAME baseline graph G.
+    # Previously ri_proj used G_projected as its own baseline, so the two indices
+    # had different denominators and their difference was not a gain at all.
     ri_base = compute_resilience_index(G, pert_base)["resilience_index"] or 0
-    ri_proj = compute_resilience_index(G_projected, pert_proj)["resilience_index"] or 0
-    
-    projected_ri = max(ri_base, ri_proj + rec["rgs"])
-    actual_rgs = projected_ri - ri_base
-    
+    ri_proj = compute_resilience_index(G, pert_proj)["resilience_index"] or 0
+
+    # M9 (removed): `max(ri_base, ri_proj + rec["rgs"])` floored the projection at
+    # the baseline AND added the recommendation's own rgs on top of a separately
+    # measured index, double-counting it. The measured projected index is reported
+    # as-is, including when the investment does not help.
+    projected_ri = ri_proj
+    actual_rgs = round(projected_ri - ri_base, 6)
+
     return JSONResponse({
         "baseline_ri": ri_base,
         "projected_ri": projected_ri,
         "rgs": actual_rgs,
+        "rgs_definition": ("RI(attack, with investment) - RI(attack, without investment), "
+                           "both measured against the same baseline graph G"),
+        "validation_outcome": ("improves" if actual_rgs > 0
+                               else "no_change" if actual_rgs == 0
+                               else "degrades"),
+        "ablated_target": str(target),
         "recommendation": rec
     })
 

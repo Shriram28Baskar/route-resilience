@@ -222,14 +222,21 @@ def generate_dynamic_prescriptions(
                         ),
                         "target_nodes": [str(n1), str(n2)],
                         "target_node": str(n1),
-                        "rgs": max(gain, 0.001),
+                        # M6 (removed): max(gain, 0.001) floored every recommendation to a
+                        # positive gain. Measured value reported as-is.
+                        "rgs": round(gain, 6),
                         "ri_before": round(baseline_ri, 4),
                         "ri_after": round(baseline_ri + gain, 4),
                         "is_articulation_point": n1_is_ap,
-                        "protects_residents": int(G_alive.number_of_nodes() * centrality.get(n1, 0) * 50),
+                        # M8 (removed): protects_residents was nodes x betweenness x 50.
+                        # Betweenness is a path count, not people, and no census
+                        # layer is joined anywhere. No substitute is supplied.
+                        "protects_residents": None,
                         "cascade_prevention": baseline_partitioned,
                         "bypass_length_m": round(dist_m, 0),
-                        "cost_estimate": _cost_estimate(dist_m),
+                        # M8 (removed): _cost_estimate() is an unsourced rupee literal keyed
+                        # on length. No costing model exists.
+                        "cost_estimate": None,
                         "action": "new_road",
                         "tactical_source": "dynamic_bounded_subgraph",
                         "subgraph_nodes": G_sub.number_of_nodes(),
@@ -255,7 +262,9 @@ def generate_dynamic_prescriptions(
             rec["tactical_source"] = "static_startup_cache"
         return cached
 
-    recs.sort(key=lambda x: x["rgs"], reverse=True)
+    # Recommendations with no measurable or a negative gain stay in the list:
+    # suppressing them would reintroduce "every recommendation helps".
+    recs.sort(key=lambda x: (x["rgs"] is None, -(x["rgs"] or 0.0)))
     return recs
 
 
@@ -383,7 +392,8 @@ def generate_recommendations(G: nx.Graph) -> List[Dict[str, Any]]:
                     best_gain = gain
                     n1_is_ap = n1 in aps
                     n2_is_ap = n2 in aps
-                    protected_pop = int(G.number_of_nodes() * centrality.get(n1, 0) * 50)  # rough estimate
+                    # M8 (removed): fabricated population estimate; no census join exists.
+                    protected_pop = None
                     best_rec = {
                         "type": "bypass",
                         "title": "Pre-Build Road Bridge" if dist_m < 200 else "Construct Bypass Corridor",
@@ -394,14 +404,18 @@ def generate_recommendations(G: nx.Graph) -> List[Dict[str, Any]]:
                         ),
                         "target_nodes": [str(n1), str(n2)],
                         "target_node": str(n1),
-                        "rgs": max(gain, 0.001),
+                        # M6 (removed): max(gain, 0.001) floored every recommendation to a
+                        # positive gain. Measured value reported as-is.
+                        "rgs": round(gain, 6),
                         "ri_before": round(baseline_ri, 4),
                         "ri_after": round(baseline_ri + gain, 4),
                         "is_articulation_point": n1_is_ap,
                         "protects_residents": protected_pop,
                         "cascade_prevention": baseline_partitioned,
                         "bypass_length_m": round(dist_m, 0),
-                        "cost_estimate": _cost_estimate(dist_m),
+                        # M8 (removed): _cost_estimate() is an unsourced rupee literal keyed
+                        # on length. No costing model exists.
+                        "cost_estimate": None,
                         "action": "new_road",
                     }
                     best_G_after = G_test
@@ -432,16 +446,25 @@ def generate_recommendations(G: nx.Graph) -> List[Dict[str, Any]]:
             ),
             "target_node": str(top_n),
             "target_nodes": [str(top_n)],
-            "rgs": round(max(rgs, 0.05), 4),
+            # M5 (removed): max(rgs, 0.05) floored every reinforcement rec.
+            "rgs": round(rgs, 4),
+            "rgs_definition": ("1 - RI(baseline with this node ablated); the damage "
+                               "averted IF hardening fully prevents failure"),
             "ri_before": round(baseline_ri, 4),
-            "ri_after": round(min(1.0, baseline_ri + rgs * 0.5), 4),
+            # M7 (removed): ri_after was `min(1.0, baseline_ri + rgs * 0.5)`. The
+            # 0.5 coefficient was invented and the value was never obtained by
+            # running the intervention. Hardening is not simulated here, so no
+            # post-intervention index is reported.
+            "ri_after": None,
             "is_articulation_point": top_n in aps,
-            "protects_residents": int(G.number_of_nodes() * centrality.get(top_n, 0) * 50),
+            "protects_residents": None,   # M8 (removed): fabricated
             "cascade_prevention": baseline_partitioned,
             "bypass_length_m": 0,
-            "cost_estimate": "Medium — flood barrier + structural reinforcement",
+            "cost_estimate": None,   # M8 (removed): unsourced
             "action": "flood_barrier",
         })
 
-    recs.sort(key=lambda x: x["rgs"], reverse=True)
+    # Recommendations with no measurable or a negative gain stay in the list:
+    # suppressing them would reintroduce "every recommendation helps".
+    recs.sort(key=lambda x: (x["rgs"] is None, -(x["rgs"] or 0.0)))
     return recs

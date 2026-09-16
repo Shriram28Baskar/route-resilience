@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from app.graph_pipeline.graph_build import GraphStore
-from app.simulation.historical import get_scenario, list_scenarios
+from app.simulation.bengaluru_2022_demo import get_scenario, list_scenarios
 from app.simulation.topography import flood_ablate, get_elevation_bounds
 from app.data.population import query_population_nodes
 from app.data.backtest import rainfall_to_water_level
@@ -40,7 +40,9 @@ async def run_historical_scenario(
         default=None,
         description=(
             "Optional override water level (m ASL). If provided, overrides the scenario's "
-            "default calibrated level. Useful for sensitivity analysis. "
+            "default FITTED level (see bengaluru_2022_demo: the level is fitted to the "
+            "documented extent, so agreement is circular and is NOT validation). "
+            "Useful for sensitivity analysis only. "
             "Must be between DEM min and max."
         ),
     ),
@@ -93,6 +95,7 @@ async def run_historical_scenario(
         scenario_water_level_m = scenario["scenario_water_level_m"]
         water_level_basis = scenario["scenario_water_level_basis"]
         water_level_note = scenario["scenario_water_level_derivation"]["step_2_calibrated_level"]["basis"]
+    water_level_is_fitted = True   # M10: never present this as validation
 
     # ── Run flood simulation ───────────────────────────────────────────────────
     flooded = flood_ablate(G, scenario_water_level_m)

@@ -222,7 +222,7 @@ if not hist_err:
           ['observed_historical_facts','model_inputs','simulated_results','directional_comparison']), "CRITICAL")
     check("Observed rainfall = 131mm", obs.get('rainfall_mm') == 131.0, "CRITICAL",
           f"got {obs.get('rainfall_mm')}")
-    check("Scenario water level = calibrated 905m (not rainfall-derived)",
+    check("Scenario water level = FITTED 905m (not rainfall-derived; fitting, NOT validation)",
           abs(sr.get('water_level_m', 0) - 905.0) < 0.01, "CRITICAL",
           f"got {sr.get('water_level_m')}")
 

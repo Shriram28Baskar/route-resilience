@@ -1,17 +1,35 @@
 """
-Historical disaster scenarios for Route Resilience.
+Bengaluru 2022 DEMONSTRATION scenario — NOT VALIDATION.
 
-Design contract:
-- This module stores OBSERVED HISTORICAL FACTS with citations.
-- These are model INPUTS, not predetermined model outputs.
-- The simulation runs actual algorithms on these inputs.
-- Results are NEVER adjusted to match documented outcomes.
-- Every displayed statistic must be traceable to a source.
+M10. This module was named `historical.py` and framed as a historical scenario
+whose outputs could be compared against the documented event. That framing was
+withdrawn after audit, for a reason stated in the module's own data:
 
-Separation of concerns:
-  OBSERVED = documented from external sources (IMD, BBMP, news archives)
-  SIMULATED = computed by Route Resilience algorithms from the observed inputs
-  COMPARISON = directional agreement check between model and documents (not validation)
+    THE WATER LEVEL IS FITTED TO THE DOCUMENTED FLOOD EXTENT.
+
+    The rainfall-runoff model yields 877.09 m from 131 mm of rain, at which only
+    ~2 nodes flood. The scenario instead uses 905 m, chosen because the documented
+    flood zones sit at ~890-910 m terrain elevation. The parameter was selected so
+    that the model would reproduce an outcome that was already known.
+
+    Any agreement between this scenario's output and the 2022 event is therefore
+    CIRCULAR. It is fitting, not validation, and must never be reported as
+    agreement between model and reality.
+
+What this module IS: a demonstration scenario with honest provenance. The IMD
+rainfall figure, the BBMP/news-archive area list and the source notes below are
+genuine external references and are retained unchanged. They document where the
+scenario's framing came from. They do not validate anything.
+
+Separation of concerns (retained):
+  OBSERVED  = documented from external sources (IMD, BBMP, news archives)
+  SIMULATED = computed by Route Resilience algorithms from the scenario inputs
+  FITTED    = chosen so the model approximates a known outcome (the water level)
+
+There is no validation tier, because no validation has been performed. Doing so
+would require an independently derived flood extent (e.g. Sentinel-1 SAR change
+detection with a threshold frozen BEFORE the road graph is touched) and a water
+level that is never adjusted to improve agreement. Neither exists here.
 """
 from typing import Dict, Any, List, Optional
 
@@ -25,7 +43,7 @@ BENGALURU_2022_FLOOD: Dict[str, Any] = {
     "id": "bengaluru_2022_urban_flood",
     "name": "2022 Bengaluru Urban Flood",
     "peak_date": "2022-09-05",
-    "data_type": "HISTORICAL_SCENARIO",
+    "data_type": "DEMONSTRATION_SCENARIO_FITTED_NOT_VALIDATION",
     "description": (
         "One of the most severe urban flooding events in recent Bengaluru history. "
         "Multiple residential layouts, arterial roads, and IT campuses were submerged. "
@@ -88,7 +106,7 @@ BENGALURU_2022_FLOOD: Dict[str, Any] = {
     # How the historical event is translated into a model input.
     # ------------------------------------------------------------------
     "scenario_water_level_m": 905.0,
-    "scenario_water_level_basis": "calibrated_to_documented_flood_extent",
+    "scenario_water_level_basis": "FITTED_to_documented_flood_extent_NOT_VALIDATION",
     "scenario_water_level_derivation": {
         "step_1_rainfall_runoff": {
             "rainfall_mm": 131.0,
@@ -111,7 +129,7 @@ BENGALURU_2022_FLOOD: Dict[str, Any] = {
                 "~890–910m per SRTMGL1 DEM. A water level of 905m encompasses these areas. "
                 "905m corresponds approximately to the mean terrain elevation of the AOI (measured: 903m), "
                 "representing a scenario where low-to-mid elevation areas are inundated. "
-                "This is a calibrated parameterization to approximate the documented flood extent — "
+                "This level is FITTED to approximate the documented flood extent — "
                 "NOT a physically derived water level from the rainfall model."
             ),
             "why_not_derived_from_rainfall": (
@@ -119,7 +137,7 @@ BENGALURU_2022_FLOOD: Dict[str, Any] = {
                 "for statistical backtest over many events. It does not model urban drainage failure, "
                 "concentrated runoff, or backwater flooding. For the 2022 extreme event, "
                 "the formula produces a non-representative result (877.09m → 2 nodes). "
-                "A calibrated scenario level is the honest alternative."
+                "A fitted scenario level is the honest alternative, PROVIDED it is never reported as agreement between model and reality."
             ),
         },
     },
@@ -141,7 +159,7 @@ BENGALURU_2022_FLOOD: Dict[str, Any] = {
     "model_limitations": [
         "DEM model is static height-threshold inundation — not hydraulic routing or drainage simulation",
         "Rainfall-to-water-level conversion (RC=0.70) does not model drainage blockage — not used for water level derivation in this scenario",
-        "Scenario water level (905m) is calibrated to documented flood extent, not physically derived from rainfall",
+        "Scenario water level (905m) is FITTED to the documented flood extent, not physically derived from rainfall. Any resulting agreement with the 2022 event is CIRCULAR and is not validation",
         "WorldPop 2020 population is a 100m gridded estimate — not census-verified",
         "Ward impact compared only against qualitative news-reported area names — not official flood maps",
         "AOI covers lon 77.57–77.64; Bellandur, Marathahalli, Whitefield (lon 77.65+) are outside boundary",

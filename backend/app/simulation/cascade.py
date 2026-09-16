@@ -21,9 +21,15 @@ from app.simulation.ablation import ablate_nodes
 
 logger = logging.getLogger(__name__)
 
-# Dampening factor: each iteration, the threshold rises so fewer nodes qualify.
-# e.g. 0.15 = threshold increases by 15% of max_score each iteration.
-_DAMPENING_FACTOR = 0.15
+# Optional stress-threshold dampening: if > 0, the threshold rises by this fraction
+# of max_score each iteration, so fewer nodes qualify over time.
+#
+# M3: DEFAULT IS NOW 0.0 (off). A non-zero value imposes monotonic decay on the
+# result rather than measuring it, so it must be an explicit, declared choice.
+# The value actually used is returned on every step as "dampening_factor".
+# Measured A/B on an identical chokepoint fixture: 0.15 produced [6, 3, 1, 0];
+# 0.0 produces [6, 21, 21, 21, 19, 21]. The decay was imposed, not observed.
+_DAMPENING_FACTOR = 0.0
 
 
 def run_cascade(
@@ -86,8 +92,11 @@ def run_cascade(
 
         # Dampened threshold: rises each iteration so fewer nodes qualify
         # This enforces the physics constraint that cascade dampens over time.
-        dampened_threshold = threshold + iteration * _DAMPENING_FACTOR
-        effective_threshold = min(dampened_threshold, 0.98)  # cap at 98% so we always show some data
+        # M3b (removed): a cap `min(dampened_threshold, 0.98)` commented
+        # "cap at 98% so we always show some data" guaranteed a non-empty
+        # result. With _DAMPENING_FACTOR == 0.0 this is exactly the
+        # caller-supplied threshold.
+        effective_threshold = threshold + iteration * _DAMPENING_FACTOR
 
         newly_stressed = [
             {
@@ -101,17 +110,13 @@ def run_cascade(
             if score >= effective_threshold * max_score and max_score > 0
         ]
 
-        # Enforce physics: cascade must actively decay, not just flatline
-        if steps:
-            prev_stressed_count = len(steps[-1]["newly_stressed"])
-            # Decay factor: next iteration can have at most ~65% of previous failures
-            max_allowed = max(0, int(prev_stressed_count * 0.65))
-            if len(newly_stressed) > max_allowed:
-                # Sort by centrality descending and truncate
-                newly_stressed = sorted(newly_stressed, key=lambda x: x["centrality"], reverse=True)[:max_allowed]
+        # M4 (removed): each iteration was truncated to 65% of the previous count,
+        # manufacturing a decay curve. Counts are now reported as measured and may
+        # rise as well as fall.
 
         steps.append({
             "iteration": iteration,
+            "dampening_factor": _DAMPENING_FACTOR,
             "ablated": [str(n) for n in current_ablated],
             "newly_stressed": newly_stressed,
             "component_count": len(components),
