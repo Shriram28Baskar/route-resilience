@@ -12,6 +12,26 @@ Reads only committed raw JSONL. Computes nothing that was not pre-registered:
 A secondary stratification to scenarios that actually partitioned the graph is
 reported alongside, never instead of, the primary. Restricting to partitioned
 scenarios would flatter every method, so the all-scenario figure leads.
+
+DEDUPLICATION (added after the audit)
+    The frozen relative scenario set contains 101 EXACT duplicate scenarios
+    (radial_25 at k=5% and k=10% both round to k=2 on a 25-node graph), so the
+    runner scored them twice: 1,515 records / 1,414 unique scenarios, 24,240
+    raw result rows / 22,624 unique. Earlier versions of this script deduplicated
+    in the paired comparisons (dict-keyed by scenario_id) but NOT in the
+    descriptive tables, which therefore reported n=1,515 in every cell under an
+    n_scenarios=1,414 header. All 1,616 duplicate rows were verified
+    byte-identical before being dropped, so no information is lost. The absolute
+    set contains no duplicate scenario_ids and is unaffected: its numbers are
+    bit-identical before and after this change.
+
+EFFECT SIZE — NOT REPORTED
+    cliffs_delta is skipped whenever n > 400, which is every cell of both sets.
+    NO effect size is reported anywhere in this experiment. That gap is stated
+    explicitly rather than filled in after the fact: computing one now, having
+    already seen the outcome, would be a post-hoc addition to a pre-registered
+    analysis. The paired median difference and its 95% CI ARE reported and are
+    0.0 / [0.0, 0.0] in every comparison; ci_excludes_zero is False throughout.
 """
 from __future__ import annotations
 
@@ -32,12 +52,35 @@ METHODS = ["I1_route_resilience", "I2_random", "I3_nearest_gap",
 PRIMARY = "delta_unreachable_fraction"
 
 
-def load(paths: List[str]) -> List[Dict]:
+def load(paths: List[str]) -> Tuple[List[Dict], Dict]:
+    """Load raw rows and drop exact duplicates keyed on (scenario, method, budget).
+
+    Returns (unique_rows, counts). A duplicate is dropped ONLY if it is
+    byte-identical to the row already kept; a genuine disagreement is fatal,
+    because it would mean the run was not deterministic.
+    """
     rows = []
     for p in paths:
         with open(p) as f:
             rows += [json.loads(l) for l in f if l.strip()]
-    return rows
+    seen: Dict = {}
+    dropped = 0
+    for r in rows:
+        k = (r["scenario_id"], r["method"], r["budget_m"])
+        blob = json.dumps(r, sort_keys=True)
+        if k in seen:
+            if seen[k] != blob:
+                sys.exit(f"NON-DETERMINISTIC DUPLICATE for {k}: results differ. Refusing to aggregate.")
+            dropped += 1
+            continue
+        seen[k] = blob
+    uniq = [json.loads(b) for b in seen.values()]
+    counts = {
+        "raw_records_on_disk": len(rows),
+        "unique_records_used": len(uniq),
+        "duplicate_records_dropped": dropped,
+    }
+    return uniq, counts
 
 
 # ── statistics ────────────────────────────────────────────────────────────────
@@ -123,8 +166,10 @@ def main():
              and (("_relative" in f) == (which == "relative"))]
     if not paths:
         sys.exit(f"no raw intervention files for set '{which}'")
-    rows = load(paths)
-    print(f"[{which} scenario set] loaded {len(rows)} raw records from "
+    rows, counts = load(paths)
+    print(f"[{which} scenario set] {counts['raw_records_on_disk']} raw records on disk, "
+          f"{counts['unique_records_used']} unique used, "
+          f"{counts['duplicate_records_dropped']} exact duplicates dropped, from "
           f"{len(paths)} file(s): {[os.path.basename(p) for p in paths]}")
 
     # context: how often did the disruption actually partition the graph?
@@ -139,8 +184,15 @@ def main():
         "scenario_set_status": ("pre-registered" if which == "absolute"
                                 else "POST-HOC extension, see PREREGISTRATION_DEVIATIONS.md D7"),
         "primary_endpoint": PRIMARY,
-        "n_scenarios": len(base),
+        "n_unique_scenarios": len(base),
         "n_partitioned": len(partitioned),
+        "record_counts": counts,
+        "deduplication": ("exact duplicate (scenario_id, method, budget) rows dropped; "
+                          "all verified byte-identical before dropping. Every table cell "
+                          "and every paired comparison now uses the same n."),
+        "effect_size": ("NOT REPORTED. cliffs_delta is skipped at n>400, which is every "
+                        "cell here. Not computed after the fact. Median difference and its "
+                        "95% bootstrap CI are reported instead."),
         "bootstrap_reps": BOOT,
         "bootstrap_seed": BOOT_SEED,
         "tables": {},

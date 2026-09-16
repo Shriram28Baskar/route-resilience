@@ -68,13 +68,43 @@ def compute_resilience_index(
     returned alongside it:
 
       * ``unreachable_fraction``  - share of baseline-reachable pairs severed.
-      * ``reachable_path_inflation`` - mean path-time ratio computed ONLY over
-        pairs reachable in both graphs. Independent of `penalty_s`.
+      * ``reachable_path_inflation`` - RATIO OF MEANS: mean perturbed path time
+        divided by mean baseline path time, over the pairs reachable in BOTH
+        graphs. (Earlier wording here said "mean path-time ratio", which reads as
+        a mean of per-pair ratios. That is a different statistic and is not what
+        is computed. Measured gap on a 21,692-pair sample: 1.015612 ratio-of-means
+        vs 1.016378 mean-of-ratios, 0.08%.) Independent of `penalty_s`.
 
     Together these fully characterise the damage without an arbitrary constant.
     No single normalised scalar is offered: collapsing "longer" and "impossible"
     into one number requires a weighting between them that this module has no
     principled basis to choose.
+
+    TWO PROPERTIES THAT MUST NOT BE REPORTED AS EMPIRICAL FINDINGS
+    -------------------------------------------------------------
+    1. ``unreachable_fraction`` cannot increase when EDGES ARE ADDED and the same
+       node set is then ablated. G+E minus A contains G minus A as a subgraph on
+       the same nodes, reachability is monotone in edges, and ``pairs_evaluated``
+       is unchanged because both indices are measured against the same baseline.
+       Therefore ``delta_unreachable_fraction >= 0`` is a THEOREM, not a result.
+       Observing ``frac_lt_0 == 0`` across an experiment confirms the
+       implementation is consistent; it is not evidence that an intervention
+       method is safe.
+
+    2. An IRREDUCIBLE part of ``unreachable_fraction`` can never be repaired.
+       When a sampled source node is itself ablated, every pair it had is charged
+       as severed (see ``_compute_perturbed_paths``), and no added edge can
+       restore a pair whose origin no longer exists. Measured median share of
+       ``unreachable_fraction`` that is irreducible in this way:
+
+           grid_400 0.575 | chokepoint_196 0.330 | ring_of_cliques_48 0.443
+           geometric_497 0.296 | radial_25 0.545
+
+       This cancels exactly in PAIRED comparisons (identical constant for every
+       method on a given scenario), so it does not bias a method-vs-method
+       verdict. It does mean every ABSOLUTE delta understates the share of
+       *repairable* damage repaired, by roughly 1.4x-2.4x on these graphs, and
+       that the metric conflates "origin deleted" with "network fragmented".
     """
     import random
 

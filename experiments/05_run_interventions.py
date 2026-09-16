@@ -25,6 +25,21 @@ Route Resilience's proposer (app/api/simulation.py::ablate_prescribe) is called
 unmodified. Budgets are charged at the true great-circle length of the proposed
 edge, not the 750 m the algorithm assumes internally.
 
+TWO ASYMMETRIES BETWEEN I1 AND I3 THAT THE RESULTS TURN ON
+    1. Edge length. I1's proposals are ~2.6x longer (median 1454.8 m vs 556.7 m).
+    2. TARGET COMPONENT. `ablate_prescribe` joins comps_sorted[i] to
+       comps_sorted[i+1] -- a CHAIN. `propose_nearest_gap` joins comps[0] to
+       comps[i+1] -- a STAR centred on the giant component. Measured over a
+       120-scenario replay: 24.1% of I1's edges never touch the giant component;
+       100% of I3's do. Under a partial budget an I1 edge can merge two minor
+       fragments and restore far fewer OD pairs. See POSTMORTEM_H2.md §1.6.
+
+NOTE ON NEW-EDGE SPEED
+    Added edges are given 50 kph while every generated edge is 30 kph, so an added
+    metre is 1.67x faster than an existing metre. This is irrelevant to the primary
+    endpoint (connectivity) but inflates ri_p* and reachable_path_inflation in
+    favour of LONG edges -- i.e. in I1's favour. I1 lost anyway.
+
 OUTPUT
     experiments/results/interventions_raw.jsonl   one record per
                                                   (scenario, method, budget)
@@ -65,7 +80,7 @@ SCENARIOS_REL = os.path.join(os.path.dirname(__file__), "scenarios", "scenarios_
 
 BUDGETS_M = [500.0, 1000.0, 2000.0]
 PENALTIES = [1800.0, 3600.0, 7200.0]
-ORACLE_POOL = 15            # bounded, deterministic candidate pool
+ORACLE_POOL = 15            # bounded, deterministic candidate pool (see _oracle_pool)
 NEW_EDGE_SPEED_KPH = 50.0
 
 
@@ -208,6 +223,10 @@ def propose_highest_degree(G, G_pert, ablated, rng) -> List[Tuple]:
 
 
 def _oracle_pool(G, G_pert, rng) -> List[Tuple]:
+    """Bounded candidate pool for I5. Deliberately small and deliberately NOT
+    exhaustive: at most ORACLE_POOL shortest candidates drawn from the top-12
+    highest-degree nodes of the two largest components. See the note at the I5
+    call site -- this is not an optimum over all possible edges."""
     comps = sorted(nx.connected_components(G_pert), key=len, reverse=True)
     pool = []
     if len(comps) > 1:
@@ -276,7 +295,17 @@ def run_scenario(G, scen: Dict) -> List[Dict]:
                 "delta_ri_p3600": round((res["ri_p3600"] or 0) - (base["ri_p3600"] or 0), 6),
             })
 
-    # I5 — greedy oracle: bounded search for the best single edge per budget.
+    # I5 — "best single edge from a bounded 15-candidate pool".
+    #
+    # NOT AN ORACLE, NOT AN UPPER BOUND, NOT HEADROOM. It evaluates at most ONE
+    # edge, while every other method may buy several within the same budget.
+    # Measured consequence on the pre-registered set: I3 beats it in 55 / 78 / 79
+    # of 1,212 scenarios at 500 / 1000 / 2000 m, I1 beats it 17 vs 9 at 2000 m
+    # (Wilcoxon p = 0.62), and I2 beats it 19 times. Its `_oracle_pool` is also
+    # drawn only from the two largest components' highest-degree nodes, so it does
+    # not search the space of possible edges. Read it as a bounded single-edge
+    # reference point, nothing more. The method key is left as "I5_oracle" so the
+    # committed raw records stay joinable; the NAME is wrong, the data is not.
     pool = _oracle_pool(G, G_pert, rng)
     for budget in BUDGETS_M:
         feasible = [e for e in pool if edge_length_m(G, *e) <= budget]

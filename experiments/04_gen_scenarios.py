@@ -40,6 +40,26 @@ MASTER_SEED = 20260915
 K_VALUES = [5, 10, 20]
 N_PER_CELL = 50
 
+
+def cell_seed(label: str, sname: str, k: int, i: int) -> int:
+    """
+    Deterministic per-cell seed.
+
+    PREVIOUSLY: ``MASTER_SEED + hash((label, sname, k, i)) % 10_000_019``.
+    CPython salts ``hash()`` of str-containing tuples per process unless
+    PYTHONHASHSEED is pinned, which this repository never did. Re-running the
+    generator therefore produced DIFFERENT ablated node sets and a different
+    file hash on every invocation. Only the S5_targeted family (12 of 1,212
+    scenarios) was deterministic, because it ignores the rng entirely.
+
+    THE COMMITTED FROZEN SCENARIO FILES PREDATE THIS FIX and were produced by
+    the salted expression. They are NOT regenerable by this function and are
+    deliberately left untouched; see scenarios/README.md. Re-running this
+    script writes to a new path unless --overwrite-frozen is passed.
+    """
+    h = hashlib.sha256(f"{label}|{sname}|{k}|{i}".encode()).digest()
+    return MASTER_SEED + int.from_bytes(h[:8], "big") % 10_000_019
+
 # Size-relative stress levels, added AFTER the absolute-k set was found to leave
 # redundant graphs unpartitioned (see PREREGISTRATION_DEVIATIONS.md D7).
 K_FRACTIONS = [0.05, 0.10, 0.20]
@@ -214,14 +234,22 @@ def main():
             "connected": nx.is_connected(G),
             "total_edge_length_m": round(sum(d["length"] for _, _, d in G.edges(data=True)), 1),
         }
-        k_list = (K_VALUES if mode == "absolute"
-                  else [max(2, int(round(f * G.number_of_nodes()))) for f in K_FRACTIONS])
+        # Deduplicate: on small graphs two different fractions can round to the
+        # same absolute k (radial_25: 0.05 and 0.10 both -> 2). The frozen
+        # relative set predates this guard and therefore contains 101 EXACT
+        # duplicate scenarios (1,515 records / 1,414 unique). See
+        # PREREGISTRATION_DEVIATIONS.md D8.
+        raw_k = (K_VALUES if mode == "absolute"
+                 else [max(2, int(round(f * G.number_of_nodes()))) for f in K_FRACTIONS])
+        k_list = sorted(dict.fromkeys(raw_k))
+        if len(k_list) != len(raw_k):
+            print(f"  {label}: k fractions collapsed {raw_k} -> {k_list} (duplicates dropped)")
         for sname, gen in GENERATORS.items():
             for k in k_list:
                 if k >= G.number_of_nodes() // 2:
                     continue
                 for i in range(N_PER_CELL):
-                    seed = MASTER_SEED + hash((label, sname, k, i)) % 10_000_019
+                    seed = cell_seed(label, sname, k, i)
                     rng = random.Random(seed)
                     nodes = gen(G, k, rng)
                     if sname == "S5_targeted" and i > 0:
@@ -237,8 +265,16 @@ def main():
     body = json.dumps(payload, indent=1, sort_keys=True)
     digest = hashlib.sha256(body.encode()).hexdigest()
     payload["sha256_of_body"] = digest
-    path = os.path.join(OUT_DIR,
-                        "scenarios.json" if mode == "absolute" else "scenarios_relative.json")
+    name = "scenarios.json" if mode == "absolute" else "scenarios_relative.json"
+    path = os.path.join(OUT_DIR, name)
+    # The committed frozen sets are EVIDENCE. They were produced by the salted
+    # hash() seeding this script no longer uses and cannot be reproduced by it.
+    # Refuse to clobber them unless the caller says so explicitly.
+    if os.path.exists(path) and "--overwrite-frozen" not in sys.argv:
+        path = os.path.join(OUT_DIR, name.replace(".json", ".regenerated.json"))
+        print(f"\n*** {name} already exists and is FROZEN EVIDENCE.")
+        print(f"*** Writing to {os.path.basename(path)} instead.")
+        print("*** Pass --overwrite-frozen only if you intend to destroy the frozen set.")
     with open(path, "w") as f:
         json.dump(payload, f, indent=1, sort_keys=True)
     print(f"\n{len(payload['scenarios'])} scenarios -> {path}")

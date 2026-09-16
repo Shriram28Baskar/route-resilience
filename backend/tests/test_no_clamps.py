@@ -187,7 +187,13 @@ def test_route_never_injects_an_unrequested_failure(chokepoint):
     """
     The guardrail ablated an extra node ON the computed path whenever the
     caller's ablation did not change the route, then attributed the detour to
-    the caller's scenario. It fired in 60% of single-node cases.
+    the caller's scenario.
+
+    Pre-fix baseline, re-measured at commit 83e6b5e on this exact sweep
+    (chokepoint fixture, seed 7, n=40): 27/40 = 68% injected a fabricated
+    on-path failure, 8/40 = 20% raised an unhandled TypeError (HTTP 500).
+    An earlier version of this docstring said 60% and 25%; neither reproduced.
+    One fixture, one seed, n=40 -- read the proportions accordingly.
     """
     from app.api.simulation import RouteRequest, route
     GraphStore.set_healed(chokepoint)

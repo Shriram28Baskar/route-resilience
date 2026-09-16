@@ -8,9 +8,7 @@
   7200.0,
   14400.0
  ],
- "scope_limit": "Largest graph tested has ~500 nodes. The real 13,486-node Bengaluru network was NOT tested here. NOTE (post-audit): a real Bengaluru OSM extract IS committed at backend/cache/befdaed17dcd4b1967a71e322ded5946f4da89e1.json and rebuilds offline to 13,486 nodes / 19,117 edges with real geometry. This run predates that discovery and did NOT use it. F7 remains UNTESTED at city scale; testing it would be a NEW EXPERIMENT and has not been run.",
- "criterion_note": "ranking_identical_across_finite_penalties requires ALL 20 positions to match across ALL 5 penalties. It is a strict criterion: a case with 1 discordant pair out of 190 fails it exactly as a case with 123 does. Read it alongside top1_identical_across_penalties and spearman_vs_3600.",
- "n_cases_note": "8 cases evaluated, 0 skipped.",
+ "scope_limit": "Largest graph tested has ~500 nodes. The real 13,486-node Bengaluru network was NOT tested: the artifact is not obtainable here and the topology proxy has no geometry or travel times. F7 remains untested at city scale.",
  "cases": [
   {
    "case": "grid_400|targeted_k10",
@@ -246,8 +244,6 @@
     "7200": 0.877682,
     "14400": 0.390028
    },
-   "spearman_undefined_penalties": [],
-   "spearman_null_means": "undefined, not zero: RI saturated to a single constant across all candidates at this penalty",
    "ranking_identical_across_finite_penalties": false,
    "top1_identical_across_penalties": false,
    "penalty_free_ranking": [
@@ -506,12 +502,8 @@
     "1800": 0.979254,
     "3600": 1.0,
     "7200": 0.933497,
-    "14400": null
+    "14400": NaN
    },
-   "spearman_undefined_penalties": [
-    "14400"
-   ],
-   "spearman_null_means": "undefined, not zero: RI saturated to a single constant across all candidates at this penalty",
    "ranking_identical_across_finite_penalties": false,
    "top1_identical_across_penalties": false,
    "penalty_free_ranking": [
@@ -772,8 +764,6 @@
     "7200": 0.565111,
     "14400": 0.547813
    },
-   "spearman_undefined_penalties": [],
-   "spearman_null_means": "undefined, not zero: RI saturated to a single constant across all candidates at this penalty",
    "ranking_identical_across_finite_penalties": false,
    "top1_identical_across_penalties": true,
    "penalty_free_ranking": [
@@ -1034,8 +1024,6 @@
     "7200": 0.947179,
     "14400": 0.958808
    },
-   "spearman_undefined_penalties": [],
-   "spearman_null_means": "undefined, not zero: RI saturated to a single constant across all candidates at this penalty",
    "ranking_identical_across_finite_penalties": false,
    "top1_identical_across_penalties": true,
    "penalty_free_ranking": [
@@ -1293,14 +1281,9 @@
     "900": 0.853774,
     "1800": 0.876707,
     "3600": 1.0,
-    "7200": null,
-    "14400": null
+    "7200": NaN,
+    "14400": NaN
    },
-   "spearman_undefined_penalties": [
-    "7200",
-    "14400"
-   ],
-   "spearman_null_means": "undefined, not zero: RI saturated to a single constant across all candidates at this penalty",
    "ranking_identical_across_finite_penalties": false,
    "top1_identical_across_penalties": true,
    "penalty_free_ranking": [
@@ -1561,8 +1544,6 @@
     "7200": 0.970749,
     "14400": 0.798632
    },
-   "spearman_undefined_penalties": [],
-   "spearman_null_means": "undefined, not zero: RI saturated to a single constant across all candidates at this penalty",
    "ranking_identical_across_finite_penalties": false,
    "top1_identical_across_penalties": false,
    "penalty_free_ranking": [
@@ -1823,8 +1804,6 @@
     "7200": 0.989728,
     "14400": 0.94554
    },
-   "spearman_undefined_penalties": [],
-   "spearman_null_means": "undefined, not zero: RI saturated to a single constant across all candidates at this penalty",
    "ranking_identical_across_finite_penalties": false,
    "top1_identical_across_penalties": false,
    "penalty_free_ranking": [
@@ -2085,8 +2064,6 @@
     "7200": 0.962457,
     "14400": 0.802911
    },
-   "spearman_undefined_penalties": [],
-   "spearman_null_means": "undefined, not zero: RI saturated to a single constant across all candidates at this penalty",
    "ranking_identical_across_finite_penalties": false,
    "top1_identical_across_penalties": false,
    "penalty_free_ranking": [
