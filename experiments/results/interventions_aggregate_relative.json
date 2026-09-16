@@ -3,149 +3,156 @@
  "scenario_set": "relative",
  "scenario_set_status": "POST-HOC extension, see PREREGISTRATION_DEVIATIONS.md D7",
  "primary_endpoint": "delta_unreachable_fraction",
- "n_scenarios": 1414,
+ "n_unique_scenarios": 1414,
  "n_partitioned": 474,
+ "record_counts": {
+  "raw_records_on_disk": 24240,
+  "unique_records_used": 22624,
+  "duplicate_records_dropped": 1616
+ },
+ "deduplication": "exact duplicate (scenario_id, method, budget) rows dropped; all verified byte-identical before dropping. Every table cell and every paired comparison now uses the same n.",
+ "effect_size": "NOT REPORTED. cliffs_delta is skipped at n>400, which is every cell here. Not computed after the fact. Median difference and its 95% bootstrap CI are reported instead.",
  "bootstrap_reps": 10000,
  "bootstrap_seed": 20260915,
  "tables": {
   "all_scenarios": {
    "I1_route_resilience|500m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.00014842,
+    "mean": 0.00015902,
     "max": 0.064273,
-    "frac_le_0": 0.9782,
+    "frac_le_0": 0.9767,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.0218,
-    "proposal_rate": 0.338,
-    "mean_length_used_m": 106.1
+    "frac_gt_0": 0.0233,
+    "proposal_rate": 0.3621,
+    "mean_length_used_m": 113.7
    },
    "I1_route_resilience|1000m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.00860616,
+    "mean": 0.00922088,
     "max": 0.364615,
-    "frac_le_0": 0.8917,
+    "frac_le_0": 0.884,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.1083,
-    "proposal_rate": 0.5373,
-    "mean_length_used_m": 331.7
+    "frac_gt_0": 0.116,
+    "proposal_rate": 0.5721,
+    "mean_length_used_m": 352.7
    },
    "I1_route_resilience|2000m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.03512789,
+    "mean": 0.03763702,
     "max": 0.550342,
-    "frac_le_0": 0.734,
+    "frac_le_0": 0.715,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.266,
-    "proposal_rate": 0.6851,
-    "mean_length_used_m": 678.6
+    "frac_gt_0": 0.285,
+    "proposal_rate": 0.7306,
+    "mean_length_used_m": 724.5
    },
    "I2_random|500m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.00060286,
+    "mean": 0.00064592,
     "max": 0.469487,
-    "frac_le_0": 0.9974,
+    "frac_le_0": 0.9972,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.0026,
-    "proposal_rate": 0.3135,
-    "mean_length_used_m": 110.3
+    "frac_gt_0": 0.0028,
+    "proposal_rate": 0.3359,
+    "mean_length_used_m": 118.2
    },
    "I2_random|1000m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.00932569,
+    "mean": 0.00999181,
     "max": 0.469487,
-    "frac_le_0": 0.9472,
+    "frac_le_0": 0.9434,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.0528,
-    "proposal_rate": 0.8944,
-    "mean_length_used_m": 654.2
+    "frac_gt_0": 0.0566,
+    "proposal_rate": 0.8925,
+    "mean_length_used_m": 647.0
    },
    "I2_random|2000m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.02430037,
+    "mean": 0.02603611,
     "max": 0.500085,
-    "frac_le_0": 0.8858,
+    "frac_le_0": 0.8777,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.1142,
+    "frac_gt_0": 0.1223,
     "proposal_rate": 0.9993,
-    "mean_length_used_m": 1630.5
+    "mean_length_used_m": 1633.4
    },
    "I3_nearest_gap|500m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.01889588,
+    "mean": 0.02024559,
     "max": 0.477778,
-    "frac_le_0": 0.8528,
+    "frac_le_0": 0.8423,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.1472,
-    "proposal_rate": 0.4541,
-    "mean_length_used_m": 170.1
+    "frac_gt_0": 0.1577,
+    "proposal_rate": 0.4866,
+    "mean_length_used_m": 182.2
    },
    "I3_nearest_gap|1000m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.0388308,
+    "mean": 0.04160443,
     "max": 0.572991,
-    "frac_le_0": 0.7281,
+    "frac_le_0": 0.7086,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.2719,
-    "proposal_rate": 0.6898,
-    "mean_length_used_m": 362.8
+    "frac_gt_0": 0.2914,
+    "proposal_rate": 0.7355,
+    "mean_length_used_m": 386.0
    },
    "I3_nearest_gap|2000m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.0545795,
+    "mean": 0.05847803,
     "max": 0.572991,
-    "frac_le_0": 0.6871,
+    "frac_le_0": 0.6648,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.3129,
-    "proposal_rate": 0.7307,
-    "mean_length_used_m": 583.7
+    "frac_gt_0": 0.3352,
+    "proposal_rate": 0.7793,
+    "mean_length_used_m": 622.7
    },
    "I4_highest_degree|500m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
@@ -156,83 +163,83 @@
     "frac_le_0": 1.0,
     "frac_lt_0": 0.0,
     "frac_gt_0": 0.0,
-    "proposal_rate": 0.3941,
-    "mean_length_used_m": 178.1
+    "proposal_rate": 0.4222,
+    "mean_length_used_m": 190.8
    },
    "I4_highest_degree|1000m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.00066253,
+    "mean": 0.00070985,
     "max": 0.297872,
-    "frac_le_0": 0.9954,
+    "frac_le_0": 0.995,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.0046,
-    "proposal_rate": 0.7868,
-    "mean_length_used_m": 621.7
+    "frac_gt_0": 0.005,
+    "proposal_rate": 0.773,
+    "mean_length_used_m": 610.6
    },
    "I4_highest_degree|2000m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.00500065,
+    "mean": 0.00535784,
     "max": 0.425532,
-    "frac_le_0": 0.9749,
+    "frac_le_0": 0.9731,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.0251,
+    "frac_gt_0": 0.0269,
     "proposal_rate": 0.9993,
-    "mean_length_used_m": 1503.5
+    "mean_length_used_m": 1497.1
    },
    "I5_oracle|500m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.00423201,
+    "mean": 0.0045343,
     "max": 0.406154,
-    "frac_le_0": 0.9452,
+    "frac_le_0": 0.9413,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.0548,
-    "proposal_rate": 0.0548,
-    "mean_length_used_m": 21.6
+    "frac_gt_0": 0.0587,
+    "proposal_rate": 0.0587,
+    "mean_length_used_m": 23.1
    },
    "I5_oracle|1000m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.02169609,
+    "mean": 0.02324581,
     "max": 0.468085,
-    "frac_le_0": 0.8099,
+    "frac_le_0": 0.7963,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.1901,
-    "proposal_rate": 0.1901,
-    "mean_length_used_m": 110.2
+    "frac_gt_0": 0.2037,
+    "proposal_rate": 0.2037,
+    "mean_length_used_m": 118.1
    },
    "I5_oracle|2000m": {
-    "n": 1515,
+    "n": 1414,
     "median": 0.0,
     "median_ci95": [
      0.0,
      0.0
     ],
-    "mean": 0.03711137,
+    "mean": 0.03976219,
     "max": 0.477778,
-    "frac_le_0": 0.7221,
+    "frac_le_0": 0.7023,
     "frac_lt_0": 0.0,
-    "frac_gt_0": 0.2779,
-    "proposal_rate": 0.2779,
-    "mean_length_used_m": 228.5
+    "frac_gt_0": 0.2977,
+    "proposal_rate": 0.2977,
+    "mean_length_used_m": 244.8
    }
   },
   "partitioned_only": {
@@ -683,111 +690,111 @@
  },
  "stratified_budget2000": {
   "family=S3_random|I1_route_resilience|2000m": {
-   "n": 750,
+   "n": 700,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.04854039,
+   "mean": 0.05200757,
    "max": 0.550342,
-   "frac_le_0": 0.656,
+   "frac_le_0": 0.6314,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.344
+   "frac_gt_0": 0.3686
   },
   "family=S3_random|I2_random|2000m": {
-   "n": 750,
+   "n": 700,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.03252956,
+   "mean": 0.0348531,
    "max": 0.500085,
-   "frac_le_0": 0.8413,
+   "frac_le_0": 0.83,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.1587
+   "frac_gt_0": 0.17
   },
   "family=S3_random|I3_nearest_gap|2000m": {
-   "n": 750,
+   "n": 700,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.07331937,
+   "mean": 0.07855647,
    "max": 0.572991,
-   "frac_le_0": 0.6227,
+   "frac_le_0": 0.5957,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.3773
+   "frac_gt_0": 0.4043
   },
   "family=S3_random|I4_highest_degree|2000m": {
-   "n": 750,
+   "n": 700,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.00986342,
+   "mean": 0.01056795,
    "max": 0.425532,
-   "frac_le_0": 0.9507,
+   "frac_le_0": 0.9471,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.0493
+   "frac_gt_0": 0.0529
   },
   "family=S3_random|I5_oracle|2000m": {
-   "n": 750,
+   "n": 700,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.05089037,
+   "mean": 0.05452539,
    "max": 0.46906,
-   "frac_le_0": 0.6427,
+   "frac_le_0": 0.6171,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.3573
+   "frac_gt_0": 0.3829
   },
   "family=S4_spatial|I1_route_resilience|2000m": {
-   "n": 750,
+   "n": 700,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.02134234,
+   "mean": 0.02286679,
    "max": 0.477778,
-   "frac_le_0": 0.816,
+   "frac_le_0": 0.8029,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.184
+   "frac_gt_0": 0.1971
   },
   "family=S4_spatial|I2_random|2000m": {
-   "n": 750,
+   "n": 700,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.01589587,
+   "mean": 0.01703129,
    "max": 0.469487,
-   "frac_le_0": 0.9347,
+   "frac_le_0": 0.93,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.0653
+   "frac_gt_0": 0.07
   },
   "family=S4_spatial|I3_nearest_gap|2000m": {
-   "n": 750,
+   "n": 700,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.03471622,
+   "mean": 0.03719595,
    "max": 0.477778,
-   "frac_le_0": 0.7547,
+   "frac_le_0": 0.7371,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.2453
+   "frac_gt_0": 0.2629
   },
   "family=S4_spatial|I4_highest_degree|2000m": {
-   "n": 750,
+   "n": 700,
    "median": 0.0,
    "median_ci95": [
     0.0,
@@ -800,82 +807,82 @@
    "frac_gt_0": 0.0
   },
   "family=S4_spatial|I5_oracle|2000m": {
-   "n": 750,
+   "n": 700,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.02339315,
+   "mean": 0.02506409,
    "max": 0.477778,
-   "frac_le_0": 0.8013,
+   "frac_le_0": 0.7871,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.1987
+   "frac_gt_0": 0.2129
   },
   "family=S5_targeted|I1_route_resilience|2000m": {
-   "n": 15,
-   "median": 0.0,
+   "n": 14,
+   "median": 0.0051245,
    "median_ci95": [
     0.0,
     0.106666
    ],
-   "mean": 0.05378007,
+   "mean": 0.0576215,
    "max": 0.212821,
-   "frac_le_0": 0.5333,
+   "frac_le_0": 0.5,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.4667
+   "frac_gt_0": 0.5
   },
   "family=S5_targeted|I2_random|2000m": {
-   "n": 15,
+   "n": 14,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.078014
    ],
-   "mean": 0.03306627,
+   "mean": 0.03542814,
    "max": 0.130544,
-   "frac_le_0": 0.6667,
+   "frac_le_0": 0.6429,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.3333
+   "frac_gt_0": 0.3571
   },
   "family=S5_targeted|I3_nearest_gap|2000m": {
-   "n": 15,
-   "median": 0.0,
+   "n": 14,
+   "median": 0.0851065,
    "median_ci95": [
     0.0,
     0.217944
    ],
-   "mean": 0.11074973,
+   "mean": 0.11866043,
    "max": 0.326154,
-   "frac_le_0": 0.5333,
+   "frac_le_0": 0.5,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.4667
+   "frac_gt_0": 0.5
   },
   "family=S5_targeted|I4_highest_degree|2000m": {
-   "n": 15,
+   "n": 14,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.01189513,
+   "mean": 0.01274479,
    "max": 0.178427,
-   "frac_le_0": 0.9333,
+   "frac_le_0": 0.9286,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.0667
+   "frac_gt_0": 0.0714
   },
   "family=S5_targeted|I5_oracle|2000m": {
-   "n": 15,
+   "n": 14,
    "median": 0.0,
    "median_ci95": [
     0.0,
-    0.078014
+    0.0620565
    ],
-   "mean": 0.0340732,
+   "mean": 0.036507,
    "max": 0.178427,
-   "frac_le_0": 0.7333,
+   "frac_le_0": 0.7143,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.2667
+   "frac_gt_0": 0.2857
   },
   "graph=chokepoint_196|I1_route_resilience|2000m": {
    "n": 303,
@@ -1073,46 +1080,46 @@
    "frac_gt_0": 0.1551
   },
   "graph=radial_25|I1_route_resilience|2000m": {
-   "n": 303,
+   "n": 202,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.00083608,
+   "mean": 0.00125412,
    "max": 0.063333,
-   "frac_le_0": 0.9868,
+   "frac_le_0": 0.9802,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.0132
+   "frac_gt_0": 0.0198
   },
   "graph=radial_25|I2_random|2000m": {
-   "n": 303,
+   "n": 202,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.00020902,
+   "mean": 0.00031353,
    "max": 0.063333,
-   "frac_le_0": 0.9967,
+   "frac_le_0": 0.995,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.0033
+   "frac_gt_0": 0.005
   },
   "graph=radial_25|I3_nearest_gap|2000m": {
-   "n": 303,
+   "n": 202,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.00083608,
+   "mean": 0.00125412,
    "max": 0.063333,
-   "frac_le_0": 0.9868,
+   "frac_le_0": 0.9802,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.0132
+   "frac_gt_0": 0.0198
   },
   "graph=radial_25|I4_highest_degree|2000m": {
-   "n": 303,
+   "n": 202,
    "median": 0.0,
    "median_ci95": [
     0.0,
@@ -1125,17 +1132,17 @@
    "frac_gt_0": 0.0
   },
   "graph=radial_25|I5_oracle|2000m": {
-   "n": 303,
+   "n": 202,
    "median": 0.0,
    "median_ci95": [
     0.0,
     0.0
    ],
-   "mean": 0.00083608,
+   "mean": 0.00125412,
    "max": 0.063333,
-   "frac_le_0": 0.9868,
+   "frac_le_0": 0.9802,
    "frac_lt_0": 0.0,
-   "frac_gt_0": 0.0132
+   "frac_gt_0": 0.0198
   },
   "graph=ring_of_cliques_48|I1_route_resilience|2000m": {
    "n": 303,

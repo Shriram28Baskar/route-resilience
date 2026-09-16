@@ -234,9 +234,13 @@ def graph_source():
     if analysis is None:
         raise HTTPException(status_code=503, detail={
             "error": "no_graph_loaded",
-            "message": ("No road graph is loaded. The OSM extract is not committed "
-                        "to the repository; run scripts/download_data.py with network "
-                        "access to Overpass, or drop the artifact in place."),
+            "message": ("No road graph is loaded. Run scripts/download_data.py to "
+                        "build it. For the default Bengaluru AOI this works OFFLINE: "
+                        "a committed Overpass response at "
+                        "backend/cache/befdaed17dcd4b1967a71e322ded5946f4da89e1.json "
+                        "is served from OSMnx's disk cache and yields a connected "
+                        "13,486-node / 19,117-edge graph. Other AOIs need network "
+                        "access to Overpass."),
             "expected_artifact": "backend/data/graphs/osm_fallback.gpickle",
             "see": "backend/data/README.md",
         })

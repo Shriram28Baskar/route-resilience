@@ -1,6 +1,17 @@
 # Deviations from the P2 design, and errors in the design itself
 
-Recorded as they were discovered, before results were interpreted.
+Recorded as they were discovered, before results were interpreted. D8–D11 were
+added after a post-publication adversarial audit and are labelled as such.
+
+> **There is no pre-registration document in this repository.** The design that
+> D1–D7 deviate *from* was never committed. F7 and F8 exist only as docstrings
+> inside the scripts that test them; F1–F6 do not exist anywhere. What IS
+> verifiable from git is the freeze ORDER: `experiments/scenarios/*.json` landed
+> in commit `2ffc871` (2026-09-15), every result file in `5f3b9f2` (2026-09-16).
+> Every other use of the word "pre-registered" in this repository should be read
+> as "frozen before the run", not as "registered against a published protocol".
+> A reviewer cannot check the analysis against a plan, because the plan is not
+> here.
 
 ---
 
@@ -16,6 +27,11 @@ event.
 
 `overpass-api.de:443` is denied by this environment's network policy. The
 Bengaluru OSM extract could not be fetched. Consequences:
+
+> **D2 IS SUBSTANTIALLY WRONG — see D9.** `overpass-api.de:443` is indeed blocked,
+> but a real Bengaluru Overpass response is committed in this repository and the
+> real road graph rebuilds from it offline. The experiments below genuinely did
+> not use it; the *reason* given for not using it was false.
 
 * **A5** ran on the *topology proxy* — the node and edge set reconstructed from
   the committed edge-betweenness cache keys, with **uniform placeholder weights
@@ -57,13 +73,23 @@ threshold is not moved after seeing results.** Any future pre-registration for
 this system should use top-K overlap (or rank-biased overlap) as the primary
 criterion for a ranking that is consumed top-down.
 
-## D4 — Oracle (I5) is a bounded greedy search, not a true optimum
+## D4 — "Oracle" (I5) is neither an oracle, an upper bound, nor headroom
 
 I5 searches a deterministic pool of at most 15 candidate edges (shortest-first,
-drawn from the highest-degree nodes of the two largest components). It is an
-**upper bound on what this candidate family can achieve**, not a global optimum
-over all possible edges. Reported as such; it establishes headroom, not
-optimality.
+drawn from the top-12 highest-degree nodes of the two largest components) and
+selects the best **single** edge. Every other method may buy several edges within
+the same budget.
+
+**Correction (post-audit).** This entry previously called I5 "an **upper bound on
+what this candidate family can achieve**" that "establishes headroom, not
+optimality." Both are wrong, and the committed raw records refute them: I3 beats
+I5 in **55 / 78 / 79** of 1,212 pre-registered scenarios at 500 / 1000 / 2000 m;
+I1 beats it **17–9** at 2000 m (Wilcoxon p = 0.62); I2-random beats it 19 times.
+It bounds nothing.
+
+Read I5 as exactly what it is: **the best single edge from a bounded
+15-candidate pool.** The method key `I5_oracle` is left unchanged in the raw
+records so they stay joinable — the name is wrong, the data is not.
 
 ## D5 — I1's internal length assumption differs from the budget charged
 
@@ -108,3 +134,68 @@ Frozen artifacts:
 
 * `scenarios/scenarios.json`          1212 scenarios, sha256 `c222fbd2e9b5…` (pre-registered)
 * `scenarios/scenarios_relative.json` 1515 scenarios, sha256 `2e8dd6747a4f…` (post-hoc)
+
+## D8 — 101 duplicate scenarios in the relative set (discovered by audit)
+
+`radial_25` has 25 nodes, so `max(2, round(f * 25))` maps the fractions
+{0.05, 0.10, 0.20} to k ∈ {2, **2**, 5}. **k=2 was generated twice**, producing
+101 byte-identical duplicate scenario records.
+
+* `scenarios_relative.json`: **1,515 records / 1,414 unique scenario_ids.**
+  Earlier text in this file said "1515 scenarios" and RESEARCH_CLOSURE.md said
+  "1,414" — both describe the same file, neither disclosed the duplication.
+* `interventions_raw_relative.jsonl`: **24,240 raw rows / 22,624 unique**
+  (1,414 × 16). All 1,616 duplicate rows verified byte-identical.
+* `07_aggregate.py` deduplicated in the *paired comparisons* (dict-keyed on
+  scenario_id → n=1,414) but **not** in the descriptive tables (→ n=1,515), so a
+  single JSON file reported two different sample sizes. Every duplicated scenario
+  is `radial_25`, which D6 records as always Δ=0, so the bias pulled medians
+  toward 0 and inflated tie fractions — conservative in direction, wrong in n.
+
+**Fixed:** the generator now deduplicates the k list; `07_aggregate.py` drops
+exact duplicate rows (refusing to proceed if any duplicate pair disagrees) and
+reports `record_counts` explicitly. The frozen scenario file and the raw JSONL
+are **unchanged** — they are evidence.
+
+## D9 — "no real road graph is available" was FALSE (discovered by audit)
+
+`backend/cache/befdaed17dcd4b1967a71e322ded5946f4da89e1.json` — 6.0 MB,
+git-tracked since the initial commit `f015407` — is a genuine Overpass API
+response (Overpass 0.7.62.11, `timestamp_osm_base` 2026-06-16, 39,264 nodes /
+12,135 ways, bbox 12.90665–12.99830 N / 77.55759–77.65045 E). OSMnx 1.9.3 is
+installed with `settings.cache_folder = './cache'` and `use_cache = True`, so
+`graph_from_bbox(12.92–12.99, 77.57–77.64)` **builds a connected 13,486-node /
+19,117-edge Bengaluru road graph with real coordinates, offline**, verified with
+sockets disabled.
+
+Consequences:
+
+1. D2's stated blocker was wrong. The port is blocked; the data is present.
+2. The "topology proxy" was never necessary. It has the same node and edge counts
+   as the real graph, minus the weights and coordinates.
+3. The withdrawn README figures "13,486 intersections" and "16,000+ road
+   segments" are **reproducible** and were over-withdrawn.
+4. POSTMORTEM_H2 §5 gate G1 is **cleared**.
+
+**None of A5, A7 or P2.2 used this graph.** Re-running any of them against it is
+a **NEW EXPERIMENT**, has not been performed, and must not be performed merely to
+obtain a better-looking number. The graph's existence is a documentation
+correction, not a research result.
+
+## D10 — duplicate ablation signatures in the PRE-REGISTERED set
+
+The absolute set contains **77 distinct `(graph, family, ablated-node-set)`
+signatures that occur more than once**, totalling **121 excess records** (10.0% of
+1,212): ring_of_cliques_48 27, radial_25 16, grid_400 12, geometric_497 12,
+chokepoint_196 10. These arise because different `(family, k, replicate)` cells
+can draw the same node set on small graphs. They are **not independent
+observations**, which the Wilcoxon signed-rank test and the bootstrap both assume.
+Not corrected: correcting it would change the pre-registered analysis after the
+fact. Disclosed here so a reviewer can discount accordingly.
+
+## D11 — the design is unbalanced by family
+
+Per `(graph, k)` cell: S3_random 50 replicates, S4_spatial 50, **S5_targeted 1**
+(the family is deterministic, so replicates would be identical). The family
+stratification in `07_aggregate.py` therefore compares n=50 cells against n=1
+cells. Reported as-is; not disclosed in the original write-up.

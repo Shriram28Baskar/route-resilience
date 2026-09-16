@@ -3,8 +3,15 @@
  "scenario_set": "absolute",
  "scenario_set_status": "pre-registered",
  "primary_endpoint": "delta_unreachable_fraction",
- "n_scenarios": 1212,
+ "n_unique_scenarios": 1212,
  "n_partitioned": 253,
+ "record_counts": {
+  "raw_records_on_disk": 19392,
+  "unique_records_used": 19392,
+  "duplicate_records_dropped": 0
+ },
+ "deduplication": "exact duplicate (scenario_id, method, budget) rows dropped; all verified byte-identical before dropping. Every table cell and every paired comparison now uses the same n.",
+ "effect_size": "NOT REPORTED. cliffs_delta is skipped at n>400, which is every cell here. Not computed after the fact. Median difference and its 95% bootstrap CI are reported instead.",
  "bootstrap_reps": 10000,
  "bootstrap_seed": 20260915,
  "tables": {

@@ -8,6 +8,17 @@ about this system. Evidence: `results/a5_k_sensitivity_proxy.json`
 
 ## The setting
 
+> **Scope correction (post-audit).** This experiment ran on a *topology proxy*
+> reconstructed from the committed centrality pickle's edge-betweenness keys —
+> uniform weights, no coordinates, 3 self-loops, 19,069 unique edges from 19,117
+> key entries. The stated reason for using the proxy, that no real Bengaluru
+> graph was obtainable, was **FALSE**: a real Overpass extract is committed at
+> `backend/cache/befdaed17dcd4b1967a71e322ded5946f4da89e1.json` and rebuilds
+> offline to a connected **13,486-node / 19,117-edge** graph with real geometry
+> — the same node and edge counts, with the weights the proxy lacks. A5 did NOT
+> use it. Re-running A5 on the real weighted graph would be a **NEW EXPERIMENT**
+> and has not been performed. The results below stand as measured on the proxy.
+
 `app/api/graph.py` caps betweenness sampling at **k = 5 pivots** when a graph
 exceeds 5000 nodes:
 
@@ -21,7 +32,9 @@ betweenness.
 
 ## The result
 
-13,486-node topology proxy, 5 seeds per k, exact betweenness = 504.6 s:
+13,486-node topology proxy, 5 seeds per k, exact betweenness = 504.6 s. All
+overlap and ρ columns are **means over the 5 seeds**; the k=200 row was missing
+from the first version of this table and has been restored:
 
 | k | Spearman ρ (mean) | ρ (min) | top-5 | top-10 | top-20 | top-50 | runtime |
 |---|---|---|---|---|---|---|---|
@@ -29,15 +42,26 @@ betweenness.
 | 25 | 0.983 | 0.980 | 0.32 | 0.54 | 0.78 | 0.79 | 0.96 s |
 | 50 | 0.980 | 0.977 | 0.52 | 0.64 | 0.88 | 0.85 | 1.98 s |
 | 100 | 0.975 | 0.971 | 0.72 | 0.78 | 0.93 | 0.91 | 3.87 s |
+| 200 | 0.971 | 0.969 | 0.84 | 0.78 | 0.91 | 0.90 | 7.57 s |
 | 500 | 0.968 | 0.966 | 0.88 | 0.86 | 0.94 | 0.92 | 19.3 s |
 | 1000 | 0.971 | 0.970 | 1.00 | 0.94 | 0.95 | 0.98 | 37.6 s |
 
 Reproduced on heterogeneous-weight synthetic graphs (1,600 and 4,000 nodes):
-ρ = 0.90–0.94 at k=5 with top-10 overlap 0.18–0.20.
+ρ = 0.90–0.94 at k=5 (means: 0.9018 and 0.9387) with top-10 overlap 0.18–0.20.
 
 ## The trap
 
-**ρ is flat across k (0.957 → 0.983) while top-10 overlap climbs 0.34 → 0.94.**
+**ρ stays in a narrow band and is NON-MONOTONIC in k — 0.957 at k=5, peaking at
+0.983 at k=25, and falling back to 0.971 at k=1000 — while top-10 overlap climbs
+0.34 → 0.94.**
+
+> **Correction.** This line previously read "ρ is flat across k (0.957 → 0.983)
+> while top-10 overlap climbs 0.34 → 0.94", which reads as two endpoint-to-
+> endpoint ranges over the same k. They are not: 0.983 is the k=25 *maximum*,
+> while 0.94 is the k=1000 value. Sampling *more* pivots yields a *lower* ρ at
+> k=500 (0.968) than at k=25 (0.983). The corrected statement is strictly
+> stronger than the original: ρ does not merely fail to improve, it declines
+> across the range over which top-K agreement more than doubles.
 
 ρ is computed over every node. A road network is mostly degree-2 junctions with
 near-zero betweenness, and *any* sampling scheme ranks those correctly — they
@@ -50,6 +74,12 @@ top-N gatekeeper list; the dashboard renders it as the network's most critical
 junctions. At k=5, **top-10 overlap with exact averages 0.34 and ranges [0.10,
 0.60] across seeds** — between four and nine of the ten junctions shown as most
 critical are not in the true top ten. ρ = 0.96 conceals this completely.
+
+**At the exact production configuration — k=5 with the production seed 42 — the
+top-5 overlap is 0.00.** Not one of the five highest-betweenness junctions in the
+network appears in the five the system would display. This single-configuration
+figure is the one that describes deployed behaviour; the seed-averaged 0.34 is
+the more conservative summary and is what the table reports.
 
 ## Consequence for the pre-registration
 
@@ -66,11 +96,12 @@ both verdicts are reported (deviation D3). The lesson generalises:
 
 ## Secondary observation
 
-Exact betweenness costs 504 s at 13,486 nodes and 107 s at 4,000 nodes. The
-k=5 cap is commented "to prevent timeouts", but `app/main.py` already
-precomputes centrality in a startup background thread and persists it to disk
-via the fingerprint-keyed cache. There is no latency argument for a 5-pivot
-approximation of a metric that is computed once and cached.
+Exact betweenness costs 504 s at 13,486 nodes and 107 s at 4,000 nodes (single
+run each, this machine; not benchmarked). The k=5 cap is commented "to prevent
+timeouts", but `app/main.py` already precomputes centrality in a startup
+background thread and persists it to disk via the fingerprint-keyed cache. There
+is no latency argument for a 5-pivot approximation of a metric that is computed
+once and cached.
 
 **Not acted on.** Changing it is outside P2.0/P2.2 scope and would alter the
 system while an evaluation of it is on record. It is logged here as a candidate

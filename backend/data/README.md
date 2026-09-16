@@ -36,7 +36,7 @@ An endpoint whose `status` is `derived` is still not a measurement. Read the
 
 | Artifact | Path | Needed by | How to obtain |
 |---|---|---|---|
-| OSM road graph | `graphs/osm_fallback.gpickle` | everything | `python scripts/download_data.py` (needs Overpass access) |
+| OSM road graph | `graphs/osm_fallback.gpickle` | everything | `python scripts/download_data.py` — **works OFFLINE for the default Bengaluru AOI.** A committed Overpass response at `backend/cache/befdaed17dcd4b1967a71e322ded5946f4da89e1.json` (39,264 nodes / 12,135 ways, `timestamp_osm_base` 2026-06-16) is read by OSMnx's own disk cache (`settings.cache_folder = ./cache`) and yields a connected **13,486-node / 19,117-edge** graph with real coordinates. Other AOIs need network access to Overpass. |
 | DEM raster | `rasters/dem.tif` | `/simulate/flood`, `/simulate/flood/curve` | Bhuvan CartoDEM or SRTM tile, clipped to the AOI bbox, elevations in metres ASL |
 | Vulnerability CSV | `census/vulnerability.csv` | `/simulate/equity-metrics` | Census of India ward tables |
 | OD matrix CSV | `census/od_matrix.csv` | `/simulate/traffic-impact` | Household travel survey / BBMP–BMTC OD study |
@@ -124,3 +124,45 @@ curl localhost:8000/graph/source         # record this fingerprint alongside res
 
 Quote the fingerprint next to any number you report. Two runs with different
 fingerprints are not comparable.
+
+
+---
+
+## The committed Overpass cache (added after the post-publication audit)
+
+`backend/cache/befdaed17dcd4b1967a71e322ded5946f4da89e1.json` — 6.0 MB,
+git-tracked since the initial commit `f015407` — is a genuine Overpass API
+response, not a derived artifact:
+
+```
+generator            Overpass API 0.7.62.11 87bfad18
+timestamp_osm_base   2026-06-16T05:57:09Z
+elements             51,399  (39,264 node, 12,135 way)
+bbox                 lat 12.90665 .. 12.99830   lon 77.55759 .. 77.65045
+highway tags         residential 8076, tertiary 979, secondary 955,
+                     primary 925, living_street 711, trunk 65, ...
+```
+
+The filename is OSMnx's SHA-1 of the query, and `osmnx.settings.cache_folder`
+defaults to `./cache`, so the fetch is served from disk. Verified by building
+the graph with `socket.connect` raising:
+
+```
+13,486 nodes, 19,117 edges, connected: True, components: 1
+sample node: (17327139, {'y': 12.9349653, 'x': 77.6240716, 'street_count': 3})
+```
+
+**Two things follow, and one does not.**
+
+1. Every statement in this repository that the OSM extract was "not committed" or
+   the graph "unobtainable" was **false**. Those statements have been corrected in
+   README.md, CLAIMS.md, RESEARCH_CLOSURE.md, `experiments/POSTMORTEM_H2.md` and
+   `experiments/PREREGISTRATION_DEVIATIONS.md` (D9).
+2. The withdrawn figures "13,486 intersections" and "16,000+ road segments" are
+   reproducible and have been reinstated as descriptions of the graph.
+3. **It does NOT follow that any result here is about Bengaluru.** A5 ran on a
+   weightless topology proxy; A7 and P2.2 ran on synthetic families. None used this
+   graph. Running them on it would be a new experiment, and none has been run.
+
+Before reporting any result against this graph, record its fingerprint via
+`GET /graph/source` and quote it alongside the number.
