@@ -133,7 +133,8 @@ carry weaker evidential weight than those from the pre-registered set.
 Frozen artifacts:
 
 * `scenarios/scenarios.json`          1212 scenarios, sha256 `c222fbd2e9b5…` (pre-registered)
-* `scenarios/scenarios_relative.json` 1515 scenarios, sha256 `2e8dd6747a4f…` (post-hoc)
+* `scenarios/scenarios_relative.json` 1,515 records / 1,414 unique scenario_ids
+  (101 exact duplicates — see D8), sha256 `2e8dd6747a4f…` (post-hoc)
 
 ## D8 — 101 duplicate scenarios in the relative set (discovered by audit)
 
